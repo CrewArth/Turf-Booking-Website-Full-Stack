@@ -37,30 +37,53 @@ export default function BookingPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const nextDays = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
 
+  // Cache for slots data
+  const [slotsCache, setSlotsCache] = useState<Record<string, Slot[]>>({});
+  const [bookingsCache, setBookingsCache] = useState<Record<string, Booking[]>>({});
+
   useEffect(() => {
     if (selectedDate) {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Check cache first
+      if (slotsCache[formattedDate] && bookingsCache[formattedDate]) {
+        setSlots(slotsCache[formattedDate]);
+        setBookings(bookingsCache[formattedDate]);
+        setLoading(false);
+        return;
+      }
+
+      // If not in cache, fetch data
       fetchSlots();
       fetchBookings();
     }
   }, [selectedDate]);
 
   const fetchSlots = async () => {
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    
     try {
       setLoading(true);
       setError(null);
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       console.log('Fetching slots for date:', formattedDate);
       
-      const response = await fetch(`/api/slots?date=${formattedDate}`);
-      const data = await response.json();
-      console.log('Raw API response:', data);
-
+      const response = await fetch(`/api/slots?date=${formattedDate}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!response.ok) {
+        const data = await response.json();
         throw new Error(data.error || 'Failed to fetch slots');
       }
+
+      const data = await response.json();
 
       if (!Array.isArray(data)) {
         console.error('Expected array of slots but received:', data);
@@ -71,6 +94,8 @@ export default function BookingPage() {
       const enabledSlots = data.filter(slot => slot.isEnabled);
       console.log('Enabled slots:', enabledSlots);
       
+      // Update cache and state
+      setSlotsCache(prev => ({ ...prev, [formattedDate]: enabledSlots }));
       setSlots(enabledSlots);
       
       if (enabledSlots.length === 0) {
@@ -86,16 +111,29 @@ export default function BookingPage() {
   };
 
   const fetchBookings = async () => {
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    
     try {
-      setError(null);
       const response = await fetch(
-        `/api/bookings?date=${format(selectedDate, 'yyyy-MM-dd')}`
+        `/api/bookings?date=${formattedDate}`,
+        {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }
       );
+      
       if (!response.ok) {
         throw new Error('Failed to fetch bookings');
       }
+      
       const data = await response.json();
-      setBookings(Array.isArray(data) ? data : []);
+      const bookingsData = Array.isArray(data) ? data : [];
+      
+      // Update cache and state
+      setBookingsCache(prev => ({ ...prev, [formattedDate]: bookingsData }));
+      setBookings(bookingsData);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
       setError('Failed to fetch bookings. Please try again.');
@@ -106,11 +144,13 @@ export default function BookingPage() {
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     setSelectedSlot(null);
+    setError(null);
   };
 
   const handleSlotSelect = (slot: Slot) => {
     if (getAvailableSlots(slot._id) > 0) {
       setSelectedSlot(slot);
+      setError(null);
     }
   };
 
@@ -127,9 +167,10 @@ export default function BookingPage() {
   };
 
   const handleBooking = async () => {
-    if (!selectedSlot || !user) return;
+    if (!selectedSlot || !user || isProcessing) return;
 
     try {
+      setIsProcessing(true);
       setError(null);
 
       // Load Razorpay script
@@ -163,6 +204,7 @@ export default function BookingPage() {
         handler: async function (response: any) {
           try {
             console.log('Payment response:', response);
+            
             // Create booking with payment details
             const bookingResponse = await fetch('/api/bookings', {
               method: 'POST',
@@ -181,7 +223,6 @@ export default function BookingPage() {
 
             if (!bookingResponse.ok) {
               const errorData = await bookingResponse.json();
-              console.error('Booking API error:', errorData);
               throw new Error(errorData.error || 'Booking failed');
             }
 
@@ -201,35 +242,35 @@ export default function BookingPage() {
 
             if (!ticketResponse.ok) {
               console.error('Failed to generate ticket:', await ticketResponse.text());
-            } else {
-              const ticketData = await ticketResponse.json();
-              console.log('Ticket generated:', ticketData);
             }
 
-            await fetchBookings();
+            // Update local state and cache
+            await Promise.all([fetchSlots(), fetchBookings()]);
             setSelectedSlot(null);
+            
+            // Show success message and redirect
             alert('Booking confirmed successfully! Your ticket has been generated.');
             window.location.href = '/bookings';
           } catch (error) {
-            console.error('Booking confirmation failed:', error);
-            alert('Payment successful but booking confirmation failed. Please contact support.');
+            console.error('Booking error:', error);
+            setError('Failed to complete booking. Please try again.');
+          } finally {
+            setIsProcessing(false);
           }
         },
         modal: {
           ondismiss: function() {
-            console.log('Payment cancelled');
-          },
-        },
-        theme: {
-          color: '#16a34a',
-        },
+            setIsProcessing(false);
+          }
+        }
       };
 
-      const paymentObject = new (window as any).Razorpay(options);
-      paymentObject.open();
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (error) {
-      console.error('Payment initiation failed:', error);
-      setError('Failed to initiate payment. Please try again.');
+      console.error('Payment initialization error:', error);
+      setError('Failed to initialize payment. Please try again.');
+      setIsProcessing(false);
     }
   };
 
