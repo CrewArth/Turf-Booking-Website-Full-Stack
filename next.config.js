@@ -43,18 +43,13 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: `
-              default-src 'self' https://*.clerk.accounts.dev https://*.vercel.app;
+              default-src 'self';
               script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.clerk.accounts.dev https://*.vercel.app;
-              style-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev;
-              img-src 'self' data: https: blob:;
-              font-src 'self' https://*.clerk.accounts.dev;
-              object-src 'none';
-              base-uri 'self';
-              form-action 'self';
-              frame-ancestors 'self';
+              worker-src 'self' blob: https://*.clerk.accounts.dev;
+              style-src 'self' 'unsafe-inline';
+              img-src 'self' blob: data: https://*.clerk.accounts.dev;
+              connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.dev;
               frame-src 'self' https://checkout.razorpay.com https://*.clerk.accounts.dev;
-              connect-src 'self' https://api.razorpay.com https://*.clerk.accounts.dev https://*.vercel.app;
-              upgrade-insecure-requests;
             `.replace(/\s+/g, ' ').trim()
           }
         ]
