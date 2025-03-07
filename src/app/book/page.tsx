@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { format, addDays } from 'date-fns';
 import { loadRazorpayScript, createPaymentOrder } from '@/lib/razorpay';
@@ -38,6 +38,7 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const nextDays = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
 
@@ -45,15 +46,24 @@ export default function BookingPage() {
   const [slotsCache, setSlotsCache] = useState<Record<string, Slot[]>>({});
   const [bookingsCache, setBookingsCache] = useState<Record<string, Booking[]>>({});
 
+  // Keep track of the last successful fetch
+  const lastFetchRef = useRef<string>('');
+
   useEffect(() => {
     if (selectedDate) {
       const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       
+      // Prevent duplicate fetches for the same date
+      if (lastFetchRef.current === formattedDate && slotsCache[formattedDate]) {
+        return;
+      }
+
       // Check cache first
       if (slotsCache[formattedDate] && bookingsCache[formattedDate]) {
         setSlots(slotsCache[formattedDate]);
         setBookings(bookingsCache[formattedDate]);
         setLoading(false);
+        lastFetchRef.current = formattedDate;
         return;
       }
 
@@ -97,6 +107,7 @@ export default function BookingPage() {
       // Update cache and state
       setSlotsCache(prev => ({ ...prev, [formattedDate]: enabledSlots }));
       setSlots(enabledSlots);
+      lastFetchRef.current = formattedDate;
       
       if (enabledSlots.length === 0) {
         setError('No slots available for this date');
@@ -171,7 +182,7 @@ export default function BookingPage() {
 
     try {
       setIsProcessing(true);
-      setError(null);
+      setPaymentError(null);
 
       // Load Razorpay script
       const isScriptLoaded = await loadRazorpayScript();
@@ -244,16 +255,14 @@ export default function BookingPage() {
               console.error('Failed to generate ticket:', await ticketResponse.text());
             }
 
-            // Update local state and cache
-            await Promise.all([fetchSlots(), fetchBookings()]);
-            setSelectedSlot(null);
-            
             // Show success message and redirect
             alert('Booking confirmed successfully! Your ticket has been generated.');
             window.location.href = '/bookings';
           } catch (error) {
             console.error('Booking error:', error);
-            setError('Failed to complete booking. Please try again.');
+            setPaymentError('Failed to complete booking. Please try again.');
+            // Refresh slots to show updated availability
+            await Promise.all([fetchSlots(), fetchBookings()]);
           } finally {
             setIsProcessing(false);
           }
@@ -261,16 +270,30 @@ export default function BookingPage() {
         modal: {
           ondismiss: function() {
             setIsProcessing(false);
-          }
+            // Refresh slots to show updated availability
+            Promise.all([fetchSlots(), fetchBookings()]);
+          },
+          escape: true,
+        },
+        theme: {
+          color: '#16a34a',
         }
       };
 
       const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function(response: any) {
+        console.error('Payment failed:', response.error);
+        setPaymentError(response.error.description || 'Payment failed. Please try again.');
+        setIsProcessing(false);
+      });
+      
       rzp.open();
     } catch (error) {
       console.error('Payment initialization error:', error);
-      setError('Failed to initialize payment. Please try again.');
+      setPaymentError(error instanceof Error ? error.message : 'Failed to initialize payment');
       setIsProcessing(false);
+      // Refresh slots to show updated availability
+      await Promise.all([fetchSlots(), fetchBookings()]);
     }
   };
 
@@ -477,6 +500,32 @@ export default function BookingPage() {
                 Book Now
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Error Message */}
+      {paymentError && (
+        <div className="fixed top-4 right-4 bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg">
+          <div className="flex">
+            <div className="py-1">
+              <svg className="h-6 w-6 text-red-500 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-bold">Payment Error</p>
+              <p className="text-sm">{paymentError}</p>
+            </div>
+            <button
+              onClick={() => setPaymentError(null)}
+              className="ml-auto -mx-1.5 -my-1.5 bg-red-50 text-red-500 rounded-lg p-1.5 hover:bg-red-100 inline-flex h-8 w-8"
+            >
+              <span className="sr-only">Dismiss</span>
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
