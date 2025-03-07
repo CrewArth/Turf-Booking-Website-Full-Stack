@@ -18,12 +18,12 @@ Authentication: Clerk
 Payments: Razorpay
 
 ## _📱 Key Implementation Details_
-Server-side rendering for optimal performance
-RESTful API design with proper error handling
-Responsive UI with Tailwind CSS
-Secure payment processing
-Date and time management for slot bookings
-Admin features for content and booking management
+Server-side rendering for optimal performance.__
+RESTful API design with proper error handling.__
+Responsive UI with Tailwind CSS__
+Secure payment processing__
+Date and time management for slot bookings__
+Admin features for content and booking management__
 
 ## 📋 Installation
 ### Prerequisites
