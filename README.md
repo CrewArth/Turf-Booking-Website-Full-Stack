@@ -2,28 +2,28 @@
 A full-stack web application for booking cricket turf slots online. This project provides a seamless booking experience for cricket enthusiasts looking to reserve turf time slots.
 
 ## _🏏 Features_
-Beautiful Landing Page: Responsive design with Hero, Gallery, and Contact sections
-Mobile-Optimized: User-friendly interface optimized for mobile devices
-Authentication System: Secure login using Clerk authentication
-Advanced Booking System: Interactive hourly slot booking with availability display
-Payment Integration: Seamless payments through Razorpay
-Ticket Generation: Unique QR-based ticket system for easy verification
-Admin Dashboard: Comprehensive tools for managing slots, turfs, and gallery content
+- Beautiful Landing Page: Responsive design with Hero, Gallery, and Contact sections
+- Mobile-Optimized: User-friendly interface optimized for mobile devices
+- Authentication System: Secure login using Clerk authentication
+- Advanced Booking System: Interactive hourly slot booking with availability display
+- Payment Integration: Seamless payments through Razorpay
+- Ticket Generation: Unique QR-based ticket system for easy verification
+- Admin Dashboard: Comprehensive tools for managing slots, turfs, and gallery content
 
 ## _🛠️ Tech Stack_
-Frontend: Next.js, TypeScript, Tailwind CSS
-Backend: Next.js
-Database: MongoDB
-Authentication: Clerk
-Payments: Razorpay
+- Frontend: Next.js, TypeScript, Tailwind CSS
+- Backend: Next.js
+- Database: MongoDB
+- Authentication: Clerk
+- Payments: Razorpay
 
 ## _📱 Key Implementation Details_
-Server-side rendering for optimal performance.__
-RESTful API design with proper error handling.__
-Responsive UI with Tailwind CSS__
-Secure payment processing__
-Date and time management for slot bookings__
-Admin features for content and booking management__
+- Server-side rendering for optimal performance.
+- RESTful API design with proper error handling.
+- Responsive UI with Tailwind CSS
+- Secure payment processing
+- Date and time management for slot bookings
+- Admin features for content and booking management
 
 ## 📋 Installation
 ### Prerequisites
