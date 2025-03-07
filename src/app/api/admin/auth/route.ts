@@ -3,6 +3,11 @@ import dbConnect from '@/lib/db';
 import { Admin } from '@/models/Admin';
 import crypto from 'crypto';
 
+// Validate environment variables
+if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+  console.error('Missing required environment variables: ADMIN_EMAIL and/or ADMIN_PASSWORD');
+}
+
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -11,6 +16,20 @@ export const maxDuration = 60; // Set max duration to 60 seconds
 export async function POST(req: Request) {
   try {
     console.log('Admin auth request received');
+    
+    // Validate environment variables
+    if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+      console.error('Admin credentials not configured');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Server configuration error',
+          message: 'Admin credentials not properly configured'
+        },
+        { status: 500 }
+      );
+    }
+
     const { email, password } = await req.json();
 
     // Debug log
@@ -18,11 +37,24 @@ export async function POST(req: Request) {
       providedEmail: email,
       expectedEmail: ADMIN_EMAIL,
       emailMatch: email === ADMIN_EMAIL,
+      passwordProvided: !!password,
     });
 
-    console.log('Connecting to database...');
-    await dbConnect();
-    console.log('Database connection established');
+    try {
+      console.log('Connecting to database...');
+      await dbConnect();
+      console.log('Database connection established');
+    } catch (dbError) {
+      console.error('Database connection failed:', dbError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Database connection failed',
+          message: 'Unable to connect to the database'
+        },
+        { status: 500 }
+      );
+    }
 
     // First check if it's the default admin
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
