@@ -3,29 +3,24 @@ import { getAuth } from '@clerk/nextjs/server';
 import Razorpay from 'razorpay';
 import { NextRequest } from 'next/server';
 
-// Validate environment variables
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-  console.error('Missing required Razorpay environment variables');
-}
-
 // Set maximum duration for the API route
-export const maxDuration = 60; // 60 seconds timeout
-
-let razorpay: Razorpay | null = null;
+export const maxDuration = 30; // 30 seconds timeout
 
 // Initialize Razorpay with error handling
+let razorpay: Razorpay | null = null;
+
 try {
-  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    console.error('Missing Razorpay credentials in environment variables');
+  } else {
     razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
     console.log('Razorpay initialized successfully');
-  } else {
-    console.error('Cannot initialize Razorpay: Missing credentials');
   }
 } catch (error) {
-  console.error('Razorpay initialization failed:', error);
+  console.error('Failed to initialize Razorpay:', error);
 }
 
 export async function POST(req: NextRequest) {
@@ -37,31 +32,11 @@ export async function POST(req: NextRequest) {
     if (!razorpay) {
       console.error('Razorpay not initialized');
       return NextResponse.json(
-        { 
+        {
           error: 'Payment service unavailable',
           message: 'Payment service is not properly configured'
         },
         { status: 503 }
-      );
-    }
-
-    // Get and validate the request body
-    const body = await req.json();
-    console.log('Request body:', {
-      ...body,
-      timestamp: new Date().toISOString()
-    });
-
-    const { amount, currency = 'INR', notes = {} } = body;
-
-    if (!amount || amount < 1) {
-      console.log('Invalid amount provided:', amount);
-      return NextResponse.json(
-        { 
-          error: 'Invalid amount',
-          message: 'Amount must be greater than 0'
-        },
-        { status: 400 }
       );
     }
 
@@ -71,7 +46,7 @@ export async function POST(req: NextRequest) {
     
     if (!userId) {
       return NextResponse.json(
-        { 
+        {
           error: 'Authentication required',
           message: 'Please sign in to create an order'
         },
@@ -79,17 +54,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('Creating Razorpay order...');
-    // Create Razorpay order
-    const order = await razorpay.orders.create({
-      amount: amount * 100, // Convert to paise
+    // Get and validate request body
+    const body = await req.json();
+    console.log('Request body:', {
+      ...body,
+      timestamp: new Date().toISOString()
+    });
+
+    const { amount, currency = 'INR', notes = {} } = body;
+
+    // Validate amount
+    if (!amount || amount < 1) {
+      console.log('Invalid amount provided:', amount);
+      return NextResponse.json(
+        {
+          error: 'Invalid amount',
+          message: 'Amount must be greater than 0'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Create order options
+    const orderOptions = {
+      amount: Math.round(amount * 100), // Convert to paise and ensure it's an integer
       currency,
       notes: {
         ...notes,
         userId,
       },
-    });
+      payment_capture: 1, // Auto capture payment
+    };
 
+    console.log('Creating Razorpay order with options:', orderOptions);
+
+    // Create order
+    const order = await razorpay.orders.create(orderOptions);
+    
     console.log('Order created successfully:', {
       orderId: order.id,
       amount: order.amount,
@@ -113,9 +114,9 @@ export async function POST(req: NextRequest) {
 
     // Check for specific Razorpay errors
     if (error instanceof Error) {
-      if (error.message.includes('auth')) {
+      if (error.message.includes('auth') || error.message.includes('key')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Payment service authentication failed',
             message: 'Unable to authenticate with payment service'
           },
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
       }
       if (error.message.includes('amount')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Invalid amount',
             message: 'The payment amount is invalid'
           },
@@ -134,10 +135,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to create payment order',
         message: 'An unexpected error occurred while creating your order',
-        details: process.env.NODE_ENV === 'development' ? 
+        details: process.env.NODE_ENV === 'development' ?
           (error instanceof Error ? error.message : 'Unknown error') : undefined
       },
       { status: 500 }
