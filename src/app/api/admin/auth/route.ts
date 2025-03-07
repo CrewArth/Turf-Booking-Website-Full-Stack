@@ -44,6 +44,7 @@ export async function POST(req: Request) {
       console.log('Connecting to database...');
       await dbConnect();
       console.log('Database connection established');
+      console.log('Database connection established');
     } catch (dbError) {
       console.error('Database connection failed:', dbError);
       return NextResponse.json(
