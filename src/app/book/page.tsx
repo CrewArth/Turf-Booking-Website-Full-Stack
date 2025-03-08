@@ -58,94 +58,107 @@ export default function BookingPage() {
   const CACHE_TIMEOUT = 5 * 60 * 1000;
   const STALE_WHILE_REVALIDATE = 30 * 1000; // 30 seconds
 
+  // Add a timeout ref for fetch operations
+  const fetchTimeoutRef = useRef<NodeJS.Timeout>();
+  const FETCH_TIMEOUT = 10000; // 10 seconds timeout
+
   // Add type definition for fetch options
   interface FetchOptions extends RequestInit {
     headers?: HeadersInit;
   }
 
-  // Optimized fetch function with SWR-like behavior
-  const fetchWithCache = async (url: string, options: FetchOptions = {}) => {
-    const cacheKey = `fetch_${url}`;
-    const cached = localStorage.getItem(cacheKey);
-    
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      const age = Date.now() - timestamp;
-      
-      // Return cached data immediately if fresh
-      if (age < CACHE_TIMEOUT) {
-        return data;
+  const fetchWithTimeout = async (url: string, options: FetchOptions = {}) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          ...(options.headers || {})
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      // Return stale data while revalidating if within SWR window
-      if (age < CACHE_TIMEOUT + STALE_WHILE_REVALIDATE) {
-        // Revalidate in background
-        fetchWithCache(url, options).catch(console.error);
-        return data;
-      }
+
+      const data = await response.json();
+      return data;
+    } finally {
+      clearTimeout(id);
     }
-    
-    // Fetch fresh data
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        ...(options.headers || {})
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    
-    const data = await response.json();
-    
-    // Cache the fresh data
-    localStorage.setItem(cacheKey, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
-    
-    return data;
   };
 
   useEffect(() => {
-    if (selectedDate) {
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-      const now = Date.now();
-      
-      // Check if we need to refresh the cache
-      const shouldRefreshCache = !lastUpdate[formattedDate] || 
-        (now - lastUpdate[formattedDate]) > CACHE_TIMEOUT;
+    if (!selectedDate) return;
 
-      // Use cache if available and not expired
-      if (!shouldRefreshCache && slotsCache[formattedDate] && bookingsCache[formattedDate]) {
-        setSlots(slotsCache[formattedDate]);
-        setBookings(bookingsCache[formattedDate]);
-        setIsLoadingSlots(false);
-        setIsLoadingBookings(false);
-        return;
-      }
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    const now = Date.now();
+    
+    // Check if we need to refresh the cache
+    const shouldRefreshCache = !lastUpdate[formattedDate] || 
+      (now - lastUpdate[formattedDate]) > CACHE_TIMEOUT;
 
-      // Fetch new data if needed
-      fetchSlots(formattedDate);
-      fetchBookings(formattedDate);
+    // Use cache if available and not expired
+    if (!shouldRefreshCache && slotsCache[formattedDate] && bookingsCache[formattedDate]) {
+      setSlots(slotsCache[formattedDate]);
+      setBookings(bookingsCache[formattedDate]);
+      setIsLoadingSlots(false);
+      setIsLoadingBookings(false);
+      return;
     }
+
+    // Reset states before fetching
+    setError(null);
+    setSlots([]);
+    setBookings([]);
+
+    // Fetch new data
+    fetchSlots(formattedDate);
+    fetchBookings(formattedDate);
+
+    // Cleanup function
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [selectedDate]);
 
   const fetchSlots = async (formattedDate: string) => {
-    if (isLoadingSlots) return; // Prevent concurrent fetches
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Set a timeout to show error if fetch takes too long
+    fetchTimeoutRef.current = setTimeout(() => {
+      setError('Request timed out. Please try again.');
+      setIsLoadingSlots(false);
+    }, FETCH_TIMEOUT);
 
     try {
       setIsLoadingSlots(true);
       setError(null);
+
+      // First test the database connection
+      const testResponse = await fetchWithTimeout('/api/test-db');
+      console.log('Database connection test:', testResponse);
+
+      // Then fetch slots
+      const response = await fetchWithTimeout(`/api/slots?date=${formattedDate}`);
+      console.log('Slots response:', response);
       
-      // Use optimized fetch function
-      const data = await fetchWithCache(`/api/slots?date=${formattedDate}`);
+      // Handle the new response format
+      const data = response.slots || response;
       
       if (!Array.isArray(data)) {
-        throw new Error('Invalid response format');
+        console.error('Invalid response format:', response);
+        throw new Error('Invalid response format from server');
       }
 
       // Filter and sort slots
@@ -161,36 +174,37 @@ export default function BookingPage() {
       if (enabledSlots.length === 0) {
         setError('No slots available for this date');
       }
+
+      // Log debug information if available
+      if (response.debug) {
+        console.log('Debug info:', response.debug);
+      }
     } catch (error) {
       console.error('Failed to fetch slots:', error);
-      // Keep showing old slots if available
-      if (!slots.length) {
-        setError('Failed to fetch slots. Please try again.');
-      }
+      setError(error instanceof Error ? error.message : 'Failed to fetch slots. Please try again.');
+      // Clear slots if there's an error
+      setSlots([]);
     } finally {
       setIsLoadingSlots(false);
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     }
   };
 
   const fetchBookings = async (formattedDate: string) => {
-    if (isLoadingBookings) return; // Prevent concurrent fetches
-
     try {
       setIsLoadingBookings(true);
       
-      // Use optimized fetch function
-      const data = await fetchWithCache(`/api/bookings?date=${formattedDate}`);
+      const data = await fetchWithTimeout(`/api/bookings?date=${formattedDate}`);
       const bookingsData = Array.isArray(data) ? data : [];
       
-      // Update cache and state
       setBookingsCache(prev => ({ ...prev, [formattedDate]: bookingsData }));
       setBookings(bookingsData);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
-      // Keep showing old bookings if available
-      if (!bookings.length) {
-        setError('Failed to fetch bookings. Please try again.');
-      }
+      setError('Failed to fetch bookings. Please try again.');
+      setBookings([]);
     } finally {
       setIsLoadingBookings(false);
     }

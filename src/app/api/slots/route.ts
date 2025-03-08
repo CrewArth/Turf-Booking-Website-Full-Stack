@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { Slot } from '@/models/Slot';
 import { auth } from '@clerk/nextjs';
+import mongoose from 'mongoose';
 
 // Add response caching for 5 minutes
 export const revalidate = 300;
@@ -11,51 +12,66 @@ const slotCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 export async function GET(req: Request) {
+  const requestId = Math.random().toString(36).substring(7);
+  const startTime = Date.now();
+
   try {
     // Get date from query params
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
     const isAdmin = req.headers.get('cookie')?.includes('admin_token=true');
 
-    console.log('Received request for date:', date);
+    console.log(`[${requestId}] Slots request received:`, {
+      date,
+      isAdmin,
+      url: req.url,
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
 
-    // Check cache first
-    const cacheKey = `slots_${date}_${isAdmin}`;
-    const cachedData = slotCache.get(cacheKey);
-    if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-      console.log('Returning cached data for:', cacheKey);
-      return NextResponse.json(cachedData.data);
-    }
-
+    // Connect to database first
+    console.log(`[${requestId}] Connecting to database...`);
     await dbConnect();
+    console.log(`[${requestId}] Database connection established`);
 
-    // For admin view, return all slots with minimal projection
-    if (isAdmin && !date) {
-      const slots = await Slot.find(
-        {},
-        { time: 1, date: 1, price: 1, totalCapacity: 1, isEnabled: 1 }
-      ).lean().sort({ date: 1, time: 1 });
-
-      // Cache the results
-      slotCache.set(cacheKey, { data: slots, timestamp: Date.now() });
-      return NextResponse.json(slots);
+    // Verify database connection
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error('Database connection is not ready');
     }
 
     // For customer view, require date parameter
     if (!date) {
+      console.log(`[${requestId}] No date parameter provided`);
       return NextResponse.json({ error: 'Date parameter is required' }, { status: 400 });
     }
 
-    // Ensure date is in YYYY-MM-DD format
-    const formattedDate = new Date(date).toISOString().split('T')[0];
+    // Ensure date is valid
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      console.log(`[${requestId}] Invalid date provided:`, date);
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
+    }
 
-    // Optimize query with lean() and specific projection
-    const slots = await Slot.find(
+    // Format date to YYYY-MM-DD
+    const formattedDate = dateObj.toISOString().split('T')[0];
+    console.log(`[${requestId}] Formatted date:`, formattedDate);
+
+    // Check cache
+    const cacheKey = `slots_${formattedDate}_${isAdmin}`;
+    const cachedData = slotCache.get(cacheKey);
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+      console.log(`[${requestId}] Returning cached data for:`, cacheKey);
+      return NextResponse.json(cachedData.data);
+    }
+
+    // Query slots with timeout
+    const queryPromise = Slot.find(
       { 
         date: formattedDate,
         isEnabled: true 
       },
       {
+        _id: 1,
         time: 1,
         price: 1,
         totalCapacity: 1,
@@ -64,17 +80,59 @@ export async function GET(req: Request) {
       }
     )
     .lean()
-    .sort({ time: 1 })
-    .hint({ date: 1, time: 1 }); // Use compound index
+    .sort({ time: 1 });
 
-    console.log(`Found ${slots.length} slots for date ${formattedDate}`);
+    // Add 5-second timeout to query
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Query timeout')), 5000);
+    });
+
+    console.log(`[${requestId}] Executing slot query for date:`, formattedDate);
+    const slots = await Promise.race([queryPromise, timeoutPromise]) as any[];
+
+    const executionTime = Date.now() - startTime;
+    console.log(`[${requestId}] Query completed in ${executionTime}ms. Found ${slots.length} slots`);
+
+    if (slots.length > 0) {
+      console.log(`[${requestId}] Sample slot:`, slots[0]);
+    } else {
+      console.log(`[${requestId}] No slots found for date:`, formattedDate);
+    }
 
     // Cache the results
-    slotCache.set(cacheKey, { data: slots, timestamp: Date.now() });
-    return NextResponse.json(slots);
+    const response = {
+      slots,
+      debug: process.env.NODE_ENV === 'development' ? {
+        requestId,
+        executionTime,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        query: { date: formattedDate, isEnabled: true }
+      } : undefined
+    };
+
+    slotCache.set(cacheKey, { 
+      data: response, 
+      timestamp: Date.now() 
+    });
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching slots:', error);
-    return NextResponse.json({ error: 'Failed to fetch slots' }, { status: 500 });
+    console.error(`[${requestId}] Error fetching slots:`, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      executionTime: Date.now() - startTime
+    });
+
+    // Clear cache if there's an error
+    slotCache.clear();
+
+    return NextResponse.json({ 
+      error: 'Failed to fetch slots',
+      details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : 'Unknown error') : undefined,
+      requestId
+    }, { status: 500 });
   }
 }
 

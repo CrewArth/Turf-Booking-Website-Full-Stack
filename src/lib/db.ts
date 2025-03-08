@@ -32,31 +32,60 @@ if (!cached) {
 }
 
 async function dbConnect(): Promise<typeof mongoose> {
+  const CONNECT_TIMEOUT = 10000; // 10 seconds
+  
   if (cached?.conn) {
-    console.log('Using cached database connection');
-    return cached.conn;
+    // Check if the connection is still valid
+    if (mongoose.connection.readyState === 1) {
+      console.log('Using existing database connection');
+      return cached.conn;
+    } else {
+      console.log('Existing connection is not valid, creating new connection');
+      cached.conn = null;
+      cached.promise = null;
+    }
   }
 
   if (!cached?.promise) {
-    console.log('Creating new database connection...');
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 10000, // Timeout after 10 seconds
-      heartbeatFrequencyMS: 1000,      // Check server status every second
+      serverSelectionTimeoutMS: CONNECT_TIMEOUT,
+      socketTimeoutMS: 30000,
+      connectTimeoutMS: CONNECT_TIMEOUT,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 10000,
+      heartbeatFrequencyMS: 1000,
     };
 
+    console.log('Creating new database connection...');
     cached!.promise = mongoose.connect(MONGODB_URI, opts);
   }
 
   try {
     console.log('Attempting to connect to MongoDB...');
-    const conn = await cached!.promise;
-    console.log('Successfully connected to MongoDB.');
+    const startTime = Date.now();
+    
+    const timeoutPromise = new Promise<typeof mongoose>((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timeout')), CONNECT_TIMEOUT)
+    );
+
+    const conn = await Promise.race([
+      cached!.promise,
+      timeoutPromise
+    ]);
+
+    const connectionTime = Date.now() - startTime;
+    console.log(`Successfully connected to MongoDB in ${connectionTime}ms`);
+
     cached!.conn = conn;
 
     // Add connection event listeners
     mongoose.connection.on('error', (err) => {
       console.error('MongoDB connection error:', err);
+      // Reset cache on error
+      cached!.conn = null;
+      cached!.promise = null;
     });
 
     mongoose.connection.on('disconnected', () => {
@@ -65,10 +94,16 @@ async function dbConnect(): Promise<typeof mongoose> {
       cached!.promise = null;
     });
 
+    mongoose.connection.on('connected', () => {
+      console.log('MongoDB connected');
+    });
+
     return conn;
   } catch (e) {
     console.error('MongoDB connection error:', e);
+    // Reset cache on error
     cached!.promise = null;
+    cached!.conn = null;
     throw e;
   }
 }
