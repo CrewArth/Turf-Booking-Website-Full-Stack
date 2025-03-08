@@ -9,42 +9,39 @@ export async function GET(req: Request) {
     console.log('Testing slots query...');
     await dbConnect();
     
-    // Get all slots without any filters
-    const allSlots = await Slot.find().lean();
+    // Get all slots with minimal projection
+    const allSlots = await Slot.find(
+      {},
+      { date: 1, time: 1, isEnabled: 1, _id: 1 }
+    ).lean();
     
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Get slots for today
-    const todaySlots = await Slot.find({
-      date: today,
-      isEnabled: true
-    }).lean();
-
-    // Get all unique dates that have slots
-    const uniqueDates = await Slot.distinct('date');
+    // Group slots by date for easier viewing
+    const slotsByDate = allSlots.reduce((acc, slot) => {
+      if (!acc[slot.date]) {
+        acc[slot.date] = [];
+      }
+      acc[slot.date].push({
+        time: slot.time,
+        isEnabled: slot.isEnabled,
+        id: slot._id
+      });
+      return acc;
+    }, {} as Record<string, any[]>);
     
     const endTime = Date.now();
-    const queryTime = endTime - startTime;
     
     return NextResponse.json({
       success: true,
-      stats: {
-        totalSlots: allSlots.length,
-        todaySlots: todaySlots.length,
-        uniqueDates: uniqueDates,
-        sampleSlot: allSlots[0] || null,
-        queryTime: `${queryTime}ms`
-      },
-      message: 'Slots query successful',
+      totalSlots: allSlots.length,
+      slotsByDate,
+      queryTime: `${endTime - startTime}ms`,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Slots test failed:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 
