@@ -30,12 +30,9 @@ const slotSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Add compound index for faster queries
-slotSchema.index({ date: 1, time: 1 });
-slotSchema.index({ isEnabled: 1 });
-
-// Add TTL index for automatic cleanup of old slots (optional)
-slotSchema.index({ date: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
+// Optimize indexes for common queries
+slotSchema.index({ date: 1, isEnabled: 1 }); // Compound index for main query
+slotSchema.index({ date: 1, time: 1 }, { unique: true }); // Ensure unique slots
 
 // Add a pre-save middleware to ensure date is in YYYY-MM-DD format
 slotSchema.pre('save', function(next) {
