@@ -56,6 +56,59 @@ export default function BookingPage() {
 
   // Cache timeout (5 minutes)
   const CACHE_TIMEOUT = 5 * 60 * 1000;
+  const STALE_WHILE_REVALIDATE = 30 * 1000; // 30 seconds
+
+  // Add type definition for fetch options
+  interface FetchOptions extends RequestInit {
+    headers?: HeadersInit;
+  }
+
+  // Optimized fetch function with SWR-like behavior
+  const fetchWithCache = async (url: string, options: FetchOptions = {}) => {
+    const cacheKey = `fetch_${url}`;
+    const cached = localStorage.getItem(cacheKey);
+    
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+      
+      // Return cached data immediately if fresh
+      if (age < CACHE_TIMEOUT) {
+        return data;
+      }
+      
+      // Return stale data while revalidating if within SWR window
+      if (age < CACHE_TIMEOUT + STALE_WHILE_REVALIDATE) {
+        // Revalidate in background
+        fetchWithCache(url, options).catch(console.error);
+        return data;
+      }
+    }
+    
+    // Fetch fresh data
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        ...(options.headers || {})
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    
+    const data = await response.json();
+    
+    // Cache the fresh data
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+    
+    return data;
+  };
 
   useEffect(() => {
     if (selectedDate) {
@@ -88,26 +141,17 @@ export default function BookingPage() {
       setIsLoadingSlots(true);
       setError(null);
       
-      const response = await fetch(`/api/slots?date=${formattedDate}`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      // Use optimized fetch function
+      const data = await fetchWithCache(`/api/slots?date=${formattedDate}`);
       
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to fetch slots');
-      }
-
-      const data = await response.json();
-
       if (!Array.isArray(data)) {
         throw new Error('Invalid response format');
       }
 
-      // Filter out disabled slots
-      const enabledSlots = data.filter(slot => slot.isEnabled);
+      // Filter and sort slots
+      const enabledSlots = data
+        .filter(slot => slot.isEnabled)
+        .sort((a, b) => a.time.localeCompare(b.time));
       
       // Update cache and state
       setSlotsCache(prev => ({ ...prev, [formattedDate]: enabledSlots }));
@@ -134,21 +178,8 @@ export default function BookingPage() {
     try {
       setIsLoadingBookings(true);
       
-      const response = await fetch(
-        `/api/bookings?date=${formattedDate}`,
-        {
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch bookings');
-      }
-      
-      const data = await response.json();
+      // Use optimized fetch function
+      const data = await fetchWithCache(`/api/bookings?date=${formattedDate}`);
       const bookingsData = Array.isArray(data) ? data : [];
       
       // Update cache and state

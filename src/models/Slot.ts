@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
 
 const slotSchema = new mongoose.Schema({
-  date: {
+  time: {
     type: String,
     required: true,
   },
-  time: {
+  date: {
     type: String,
     required: true,
   },
@@ -15,20 +15,27 @@ const slotSchema = new mongoose.Schema({
   },
   totalCapacity: {
     type: Number,
-    default: 3,
-  },
-  isNight: {
-    type: Boolean,
-    default: false,
+    required: true,
+    default: 1,
   },
   isEnabled: {
     type: Boolean,
     default: true,
   },
+  isNight: {
+    type: Boolean,
+    default: false,
+  },
+}, {
+  timestamps: true,
 });
 
-// Create a compound index for date and time to ensure uniqueness
-slotSchema.index({ date: 1, time: 1 }, { unique: true });
+// Add compound index for faster queries
+slotSchema.index({ date: 1, time: 1 });
+slotSchema.index({ isEnabled: 1 });
+
+// Add TTL index for automatic cleanup of old slots (optional)
+slotSchema.index({ date: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
 
 // Add a pre-save middleware to ensure date is in YYYY-MM-DD format
 slotSchema.pre('save', function(next) {

@@ -3,10 +3,15 @@ import dbConnect from '@/lib/db';
 import { Slot } from '@/models/Slot';
 import { auth } from '@clerk/nextjs';
 
+// Add response caching for 5 minutes
+export const revalidate = 300;
+
+// Cache for slot data
+const slotCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 export async function GET(req: Request) {
   try {
-    await dbConnect();
-    
     // Get date from query params
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
@@ -14,9 +19,25 @@ export async function GET(req: Request) {
 
     console.log('Received request for date:', date);
 
-    // For admin view, return all slots
+    // Check cache first
+    const cacheKey = `slots_${date}_${isAdmin}`;
+    const cachedData = slotCache.get(cacheKey);
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+      console.log('Returning cached data for:', cacheKey);
+      return NextResponse.json(cachedData.data);
+    }
+
+    await dbConnect();
+
+    // For admin view, return all slots with minimal projection
     if (isAdmin && !date) {
-      const slots = await Slot.find().sort({ date: 1, time: 1 });
+      const slots = await Slot.find(
+        {},
+        { time: 1, date: 1, price: 1, totalCapacity: 1, isEnabled: 1 }
+      ).lean().sort({ date: 1, time: 1 });
+
+      // Cache the results
+      slotCache.set(cacheKey, { data: slots, timestamp: Date.now() });
       return NextResponse.json(slots);
     }
 
@@ -27,17 +48,29 @@ export async function GET(req: Request) {
 
     // Ensure date is in YYYY-MM-DD format
     const formattedDate = new Date(date).toISOString().split('T')[0];
-    console.log('Formatted date:', formattedDate);
 
-    // Find slots for the specific date
-    const slots = await Slot.find({ 
-      date: formattedDate,
-      isEnabled: true 
-    }).sort({ time: 1 }); // Sort by time
+    // Optimize query with lean() and specific projection
+    const slots = await Slot.find(
+      { 
+        date: formattedDate,
+        isEnabled: true 
+      },
+      {
+        time: 1,
+        price: 1,
+        totalCapacity: 1,
+        isNight: 1,
+        isEnabled: 1
+      }
+    )
+    .lean()
+    .sort({ time: 1 })
+    .hint({ date: 1, time: 1 }); // Use compound index
 
     console.log(`Found ${slots.length} slots for date ${formattedDate}`);
-    console.log('Slots:', JSON.stringify(slots, null, 2));
 
+    // Cache the results
+    slotCache.set(cacheKey, { data: slots, timestamp: Date.now() });
     return NextResponse.json(slots);
   } catch (error) {
     console.error('Error fetching slots:', error);
