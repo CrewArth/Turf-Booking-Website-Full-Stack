@@ -22,7 +22,23 @@ export async function GET(req: Request) {
     // Connect to database
     await dbConnect();
 
-    // Simple query to get slots for the date
+    console.log('Querying slots with:', {
+      date: formattedDate,
+      query: { date: formattedDate }
+    });
+
+    // First, check if any slots exist for this date without filters
+    const allSlotsForDate = await Slot.find({ date: formattedDate }).lean();
+    console.log('All slots found for date:', {
+      count: allSlotsForDate.length,
+      slots: allSlotsForDate.map(s => ({
+        time: s.time,
+        enabled: s.isEnabled,
+        id: s._id
+      }))
+    });
+
+    // Then get the filtered slots
     const slots = await Slot.find(
       { date: formattedDate },
       {
@@ -31,21 +47,32 @@ export async function GET(req: Request) {
         totalCapacity: 1,
         isNight: 1,
         isEnabled: 1,
-        _id: 1
+        _id: 1,
+        date: 1
       }
     )
     .lean()
     .sort({ time: 1 });
 
-    // Log the results for debugging
-    console.log(`Found ${slots.length} slots for date ${formattedDate}:`, 
-      slots.map(s => ({ time: s.time, enabled: s.isEnabled }))
-    );
+    console.log('Filtered slots:', {
+      count: slots.length,
+      slots: slots.map(s => ({
+        time: s.time,
+        enabled: s.isEnabled,
+        id: s._id,
+        date: s.date
+      }))
+    });
 
     return NextResponse.json({ 
       success: true,
       slots,
-      date: formattedDate
+      date: formattedDate,
+      debug: {
+        totalSlotsForDate: allSlotsForDate.length,
+        filteredSlotsCount: slots.length,
+        requestedDate: formattedDate
+      }
     });
   } catch (error) {
     console.error('Error fetching slots:', error);
@@ -55,6 +82,16 @@ export async function GET(req: Request) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
+}
+
+interface SlotDocument {
+  _id: string;
+  date: string;
+  time: string;
+  price: number;
+  totalCapacity: number;
+  isNight: boolean;
+  isEnabled: boolean;
 }
 
 export async function POST(req: Request) {
@@ -84,12 +121,17 @@ export async function POST(req: Request) {
         isEnabled: data.isEnabled ?? true
       },
       { upsert: true, new: true, lean: true }
-    );
+    ) as SlotDocument | null;
+
+    if (!slot) {
+      throw new Error('Failed to create/update slot');
+    }
 
     console.log('Slot created/updated:', {
       date: slot.date,
       time: slot.time,
-      enabled: slot.isEnabled
+      enabled: slot.isEnabled,
+      id: slot._id
     });
 
     return NextResponse.json({ success: true, slot });
@@ -118,7 +160,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Slot ID is required' }, { status: 400 });
     }
 
-    const result = await Slot.findByIdAndDelete(slotId);
+    const result = await Slot.findByIdAndDelete(slotId) as SlotDocument | null;
     if (!result) {
       return NextResponse.json({ error: 'Slot not found' }, { status: 404 });
     }
