@@ -2,9 +2,14 @@ import Razorpay from 'razorpay';
 
 // Only initialize Razorpay instance on the server
 const isServer = typeof window === 'undefined';
+
+// Validate Razorpay keys
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_P87vWqcCvdKNLm';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '35itOlQ0L6EcH5C9KGAx08VE';
+
 export const razorpay = isServer ? new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
+  key_id: RAZORPAY_KEY_ID,
+  key_secret: RAZORPAY_KEY_SECRET,
 }) : null;
 
 export function loadRazorpayScript(): Promise<boolean> {
@@ -27,6 +32,7 @@ export function loadRazorpayScript(): Promise<boolean> {
     console.log('Creating Razorpay script element...');
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
     
     // Add timeout to prevent hanging
     const timeoutId = setTimeout(() => {

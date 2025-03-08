@@ -49,37 +49,44 @@ export default function BookingPage() {
   // Keep track of the last successful fetch
   const lastFetchRef = useRef<string>('');
 
+  // Add loading states for better UX
+  const [isLoadingSlots, setIsLoadingSlots] = useState(true);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Record<string, number>>({});
+
+  // Cache timeout (5 minutes)
+  const CACHE_TIMEOUT = 5 * 60 * 1000;
+
   useEffect(() => {
     if (selectedDate) {
       const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const now = Date.now();
       
-      // Prevent duplicate fetches for the same date
-      if (lastFetchRef.current === formattedDate && slotsCache[formattedDate]) {
-        return;
-      }
+      // Check if we need to refresh the cache
+      const shouldRefreshCache = !lastUpdate[formattedDate] || 
+        (now - lastUpdate[formattedDate]) > CACHE_TIMEOUT;
 
-      // Check cache first
-      if (slotsCache[formattedDate] && bookingsCache[formattedDate]) {
+      // Use cache if available and not expired
+      if (!shouldRefreshCache && slotsCache[formattedDate] && bookingsCache[formattedDate]) {
         setSlots(slotsCache[formattedDate]);
         setBookings(bookingsCache[formattedDate]);
-        setLoading(false);
-        lastFetchRef.current = formattedDate;
+        setIsLoadingSlots(false);
+        setIsLoadingBookings(false);
         return;
       }
 
-      // If not in cache, fetch data
-      fetchSlots();
-      fetchBookings();
+      // Fetch new data if needed
+      fetchSlots(formattedDate);
+      fetchBookings(formattedDate);
     }
   }, [selectedDate]);
 
-  const fetchSlots = async () => {
-    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-    
+  const fetchSlots = async (formattedDate: string) => {
+    if (isLoadingSlots) return; // Prevent concurrent fetches
+
     try {
-      setLoading(true);
+      setIsLoadingSlots(true);
       setError(null);
-      console.log('Fetching slots for date:', formattedDate);
       
       const response = await fetch(`/api/slots?date=${formattedDate}`, {
         headers: {
@@ -96,35 +103,37 @@ export default function BookingPage() {
       const data = await response.json();
 
       if (!Array.isArray(data)) {
-        console.error('Expected array of slots but received:', data);
         throw new Error('Invalid response format');
       }
 
       // Filter out disabled slots
       const enabledSlots = data.filter(slot => slot.isEnabled);
-      console.log('Enabled slots:', enabledSlots);
       
       // Update cache and state
       setSlotsCache(prev => ({ ...prev, [formattedDate]: enabledSlots }));
       setSlots(enabledSlots);
-      lastFetchRef.current = formattedDate;
+      setLastUpdate(prev => ({ ...prev, [formattedDate]: Date.now() }));
       
       if (enabledSlots.length === 0) {
         setError('No slots available for this date');
       }
     } catch (error) {
       console.error('Failed to fetch slots:', error);
-      setError('Failed to fetch slots. Please try again.');
-      setSlots([]);
+      // Keep showing old slots if available
+      if (!slots.length) {
+        setError('Failed to fetch slots. Please try again.');
+      }
     } finally {
-      setLoading(false);
+      setIsLoadingSlots(false);
     }
   };
 
-  const fetchBookings = async () => {
-    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-    
+  const fetchBookings = async (formattedDate: string) => {
+    if (isLoadingBookings) return; // Prevent concurrent fetches
+
     try {
+      setIsLoadingBookings(true);
+      
       const response = await fetch(
         `/api/bookings?date=${formattedDate}`,
         {
@@ -147,9 +156,21 @@ export default function BookingPage() {
       setBookings(bookingsData);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
-      setError('Failed to fetch bookings. Please try again.');
-      setBookings([]);
+      // Keep showing old bookings if available
+      if (!bookings.length) {
+        setError('Failed to fetch bookings. Please try again.');
+      }
+    } finally {
+      setIsLoadingBookings(false);
     }
+  };
+
+  const refreshData = async () => {
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    await Promise.all([
+      fetchSlots(formattedDate),
+      fetchBookings(formattedDate)
+    ]);
   };
 
   const handleDateSelect = (date: Date) => {
@@ -262,7 +283,7 @@ export default function BookingPage() {
             console.error('Booking error:', error);
             setPaymentError('Failed to complete booking. Please try again.');
             // Refresh slots to show updated availability
-            await Promise.all([fetchSlots(), fetchBookings()]);
+            await Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
           } finally {
             setIsProcessing(false);
           }
@@ -271,7 +292,7 @@ export default function BookingPage() {
           ondismiss: function() {
             setIsProcessing(false);
             // Refresh slots to show updated availability
-            Promise.all([fetchSlots(), fetchBookings()]);
+            Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
           },
           escape: true,
         },
@@ -293,7 +314,7 @@ export default function BookingPage() {
       setPaymentError(error instanceof Error ? error.message : 'Failed to initialize payment');
       setIsProcessing(false);
       // Refresh slots to show updated availability
-      await Promise.all([fetchSlots(), fetchBookings()]);
+      await Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
     }
   };
 
@@ -349,11 +370,11 @@ export default function BookingPage() {
 
           {/* Content Section */}
           <div className="mt-8">
-            {loading ? (
+            {isLoadingSlots && !slots.length ? (
               <div className="flex justify-center items-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
               </div>
-            ) : error ? (
+            ) : error && !slots.length ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                 <div className="text-center">
                   <svg 
@@ -386,8 +407,8 @@ export default function BookingPage() {
                     <button
                       onClick={() => {
                         setError(null);
-                        fetchSlots();
-                        fetchBookings();
+                        fetchSlots(format(selectedDate, 'yyyy-MM-dd'));
+                        fetchBookings(format(selectedDate, 'yyyy-MM-dd'));
                       }}
                       className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
@@ -529,6 +550,17 @@ export default function BookingPage() {
           </div>
         </div>
       )}
+
+      {/* Add a refresh button */}
+      <button
+        onClick={refreshData}
+        className="fixed bottom-24 right-4 p-2 bg-white rounded-full shadow-lg hover:bg-gray-50"
+        title="Refresh slots"
+      >
+        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
     </div>
   );
 } 

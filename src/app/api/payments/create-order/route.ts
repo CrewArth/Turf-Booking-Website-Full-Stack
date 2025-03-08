@@ -6,18 +6,16 @@ import { NextRequest } from 'next/server';
 // Set maximum duration for the API route
 export const maxDuration = 30; // 30 seconds timeout
 
+// Razorpay keys
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_P87vWqcCvdKNLm';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '35itOlQ0L6EcH5C9KGAx08VE';
+const NEXT_PUBLIC_RAZORPAY_KEY_ID = RAZORPAY_KEY_ID;
+
 // Initialize Razorpay with error handling
 let razorpay: Razorpay | null = null;
 
 function initializeRazorpay() {
   console.log('Initializing Razorpay...');
-  console.log('Environment variables available:', {
-    hasKeyId: !!process.env.RAZORPAY_KEY_ID,
-    hasKeySecret: !!process.env.RAZORPAY_KEY_SECRET,
-    hasPublicKey: !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-    environment: process.env.NODE_ENV,
-    envKeys: Object.keys(process.env).filter(key => key.includes('RAZORPAY'))
-  });
 
   if (razorpay) {
     console.log('Using existing Razorpay instance');
@@ -25,18 +23,10 @@ function initializeRazorpay() {
   }
 
   try {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.error('Missing Razorpay credentials:', {
-        keyId: process.env.RAZORPAY_KEY_ID ? 'present' : 'missing',
-        keySecret: process.env.RAZORPAY_KEY_SECRET ? 'present' : 'missing'
-      });
-      return null;
-    }
-
-    console.log('Creating new Razorpay instance...');
+    console.log('Creating new Razorpay instance with key:', RAZORPAY_KEY_ID);
     razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
     });
 
     console.log('Razorpay instance created successfully');
@@ -67,8 +57,7 @@ export async function POST(req: NextRequest) {
         {
           error: 'Payment service unavailable',
           message: 'Payment service is not properly configured',
-          requestId,
-          details: process.env.NODE_ENV === 'development' ? 'Missing Razorpay credentials' : undefined
+          requestId
         },
         { status: 503 }
       );
@@ -129,7 +118,7 @@ export async function POST(req: NextRequest) {
       notes: {
         ...notes,
         userId,
-        environment: process.env.NODE_ENV || 'unknown',
+        environment: process.env.NODE_ENV || 'production',
         requestId
       },
       payment_capture: 1,
@@ -147,17 +136,11 @@ export async function POST(req: NextRequest) {
       executionTime: Date.now() - startTime
     });
 
-    // Validate the public key
-    if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
-      console.error(`[${requestId}] Missing NEXT_PUBLIC_RAZORPAY_KEY_ID`);
-      throw new Error('Payment configuration error');
-    }
-
     const response = {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      key: NEXT_PUBLIC_RAZORPAY_KEY_ID,
       requestId
     };
 
@@ -169,13 +152,7 @@ export async function POST(req: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
       executionTime: errorTime,
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      hasRazorpayKeys: {
-        keyId: !!process.env.RAZORPAY_KEY_ID,
-        keySecret: !!process.env.RAZORPAY_KEY_SECRET,
-        publicKeyId: !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
-      }
+      timestamp: new Date().toISOString()
     });
 
     // Check for specific Razorpay errors
@@ -188,7 +165,7 @@ export async function POST(req: NextRequest) {
           {
             error: 'Payment service authentication failed',
             message: 'Unable to authenticate with payment service',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+            details: error.message,
             requestId
           },
           { status: 500 }
@@ -210,8 +187,7 @@ export async function POST(req: NextRequest) {
       {
         error: 'Failed to create payment order',
         message: 'An unexpected error occurred while creating your order',
-        details: process.env.NODE_ENV === 'development' ?
-          (error instanceof Error ? error.message : 'Unknown error') : undefined,
+        details: error instanceof Error ? error.message : 'Unknown error',
         requestId
       },
       { status: 500 }
