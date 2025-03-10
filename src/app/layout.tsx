@@ -11,10 +11,12 @@ const inter = Inter({
   display: 'swap',
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export const metadata: Metadata = {
   title: "TurfBook - Cricket Turf Booking",
   description: "Book your cricket turf online with ease. Choose from multiple locations and time slots.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'),
+  metadataBase: new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`),
   viewport: 'width=device-width, initial-scale=1',
   icons: {
     icon: '/favicon.ico',
