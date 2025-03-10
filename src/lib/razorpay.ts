@@ -3,33 +3,49 @@ import Razorpay from 'razorpay';
 // Only initialize Razorpay instance on the server
 const isServer = typeof window === 'undefined';
 
-// Validate Razorpay keys
-const RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID;
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+// Validate and get Razorpay keys with better error handling
+function getRazorpayCredentials() {
+  const key_id = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  const public_key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
-if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-  console.error('Missing Razorpay credentials');
+  console.log('Razorpay Credentials Check:', {
+    hasKeyId: !!key_id,
+    hasKeySecret: !!key_secret,
+    hasPublicKey: !!public_key,
+    environment: process.env.NODE_ENV
+  });
+
+  if (!key_id || !key_secret) {
+    throw new Error('Razorpay credentials are missing. Please check your environment variables.');
+  }
+
+  return { key_id, key_secret, public_key };
 }
 
-// Initialize Razorpay only on server and only if credentials are available
-export const razorpay = isServer && RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET
-  ? new Razorpay({
-      key_id: RAZORPAY_KEY_ID,
-      key_secret: RAZORPAY_KEY_SECRET,
-    })
-  : null;
+// Initialize Razorpay only on server
+export const razorpay = isServer ? (() => {
+  try {
+    const { key_id, key_secret } = getRazorpayCredentials();
+    return new Razorpay({
+      key_id,
+      key_secret,
+    });
+  } catch (error) {
+    console.error('Failed to initialize Razorpay:', error);
+    return null;
+  }
+})() : null;
 
 export function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') {
-      console.log('Script loading skipped - running on server');
       resolve(false);
       return;
     }
 
     // Check if Razorpay is already loaded
     if ((window as any).Razorpay) {
-      console.log('Razorpay script already loaded');
       resolve(true);
       return;
     }
@@ -75,6 +91,14 @@ export async function createPaymentOrder(options: PaymentOptions) {
       throw new Error('Invalid amount format');
     }
 
+    // Log request details (without sensitive info)
+    console.log('Creating payment order:', {
+      amount,
+      currency: options.currency,
+      hasNotes: !!options.notes,
+      environment: process.env.NODE_ENV
+    });
+
     const response = await fetch('/api/payments/create-order', {
       method: 'POST',
       headers: {
@@ -86,15 +110,24 @@ export async function createPaymentOrder(options: PaymentOptions) {
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || errorData.error || 'Failed to create payment order');
-    }
-
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Payment order creation failed:', {
+        status: response.status,
+        error: data.error,
+        message: data.message
+      });
+      throw new Error(data.message || data.error || 'Failed to create payment order');
+    }
 
     // Validate response data
     if (!data.orderId || !data.amount || !data.key) {
+      console.error('Invalid order response:', {
+        hasOrderId: !!data.orderId,
+        hasAmount: !!data.amount,
+        hasKey: !!data.key
+      });
       throw new Error('Invalid order response from server');
     }
 
