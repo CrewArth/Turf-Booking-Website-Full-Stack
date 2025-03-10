@@ -18,14 +18,27 @@ interface TicketProps {
 }
 
 function formatTime(time: string): string {
-  const [hours, minutes] = time.split(':');
-  const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const formattedHour = hour % 12 || 12;
-  return `${formattedHour}:${minutes} ${ampm}`;
+  try {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const formattedHour = hour % 12 || 12;
+    return `${formattedHour}:${minutes} ${ampm}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return time;
+  }
 }
 
 export default function Ticket({ ticket }: TicketProps) {
+  if (!ticket) {
+    return (
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden max-w-md mx-auto p-6">
+        <p className="text-center text-gray-600">Ticket information not available</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden max-w-md mx-auto">
       {/* Ticket Header */}
@@ -71,14 +84,15 @@ export default function Ticket({ ticket }: TicketProps) {
               alt="Ticket QR Code"
               fill
               className="object-contain"
+              priority
             />
           </div>
         </div>
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-600">
-          <p>Generated on {format(new Date(ticket.createdAt), 'MMM d, yyyy h:mm a')}</p>
-          <p className="mt-2">Please show this ticket at the venue</p>
+          <p>Please show this ticket at the venue</p>
+          <p className="mt-1">Generated on {format(new Date(ticket.createdAt), 'MMM d, yyyy h:mm a')}</p>
         </div>
       </div>
 
