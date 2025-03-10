@@ -30,7 +30,7 @@ function formatTime(time: string): string {
 }
 
 export default function BookingPage() {
-  const { user } = useUser();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -39,6 +39,7 @@ export default function BookingPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const nextDays = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
 
@@ -93,6 +94,40 @@ export default function BookingPage() {
     }
   };
 
+  // Add interval for real-time updates
+  useEffect(() => {
+    // Update current time every minute
+    const intervalId = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // every minute
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Filter out passed slots
+  const filterPassedSlots = (slots: Slot[]) => {
+    const now = currentTime;
+    const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+    const todayStr = format(now, 'yyyy-MM-dd');
+
+    return slots.filter(slot => {
+      // If selected date is in the future, show all slots
+      if (selectedDateStr > todayStr) return true;
+
+      // If selected date is in the past, show no slots
+      if (selectedDateStr < todayStr) return false;
+
+      // For today, compare times
+      const [hours, minutes] = slot.time.split(':');
+      const slotTime = new Date();
+      slotTime.setHours(parseInt(hours), parseInt(minutes), 0);
+
+      // Add 15 minutes buffer to allow last-minute bookings
+      const bufferTime = new Date(now.getTime() - 15 * 60000);
+      return slotTime > bufferTime;
+    });
+  };
+
   useEffect(() => {
     if (!selectedDate) return;
 
@@ -129,6 +164,7 @@ export default function BookingPage() {
     };
   }, [selectedDate]);
 
+  // Modify the fetchSlots function to filter passed slots
   const fetchSlots = async (formattedDate: string) => {
     // Clear any existing timeout
     if (fetchTimeoutRef.current) {
@@ -165,13 +201,16 @@ export default function BookingPage() {
       const enabledSlots = data
         .filter(slot => slot.isEnabled)
         .sort((a, b) => a.time.localeCompare(b.time));
+
+      // Filter out passed slots
+      const availableSlots = filterPassedSlots(enabledSlots);
       
       // Update cache and state
-      setSlotsCache(prev => ({ ...prev, [formattedDate]: enabledSlots }));
-      setSlots(enabledSlots);
+      setSlotsCache(prev => ({ ...prev, [formattedDate]: availableSlots }));
+      setSlots(availableSlots);
       setLastUpdate(prev => ({ ...prev, [formattedDate]: Date.now() }));
       
-      if (enabledSlots.length === 0) {
+      if (availableSlots.length === 0) {
         setError('No slots available for this date');
       }
 
@@ -191,6 +230,30 @@ export default function BookingPage() {
       }
     }
   };
+
+  // Add effect to refresh slots when current time changes
+  useEffect(() => {
+    if (selectedDate) {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      
+      // Only refresh if viewing today's slots
+      if (formattedDate === todayStr) {
+        const currentSlots = slots;
+        const filteredSlots = filterPassedSlots(currentSlots);
+        
+        // Update slots if any were filtered out
+        if (filteredSlots.length !== currentSlots.length) {
+          setSlots(filteredSlots);
+          
+          // Clear selected slot if it was filtered out
+          if (selectedSlot && !filteredSlots.find(s => s._id === selectedSlot._id)) {
+            setSelectedSlot(null);
+          }
+        }
+      }
+    }
+  }, [currentTime, selectedDate]);
 
   const fetchBookings = async (formattedDate: string) => {
     try {
@@ -362,6 +425,15 @@ export default function BookingPage() {
       await Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
     }
   };
+
+  // Add loading state for user profile
+  if (!isUserLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-12 bg-gray-50">
@@ -606,6 +678,13 @@ export default function BookingPage() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
+
+      {/* Add a timestamp display for debugging */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-4 left-4 bg-white p-2 rounded shadow text-xs">
+          Current time: {currentTime.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 } 

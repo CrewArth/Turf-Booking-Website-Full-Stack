@@ -33,6 +33,9 @@ export default authMiddleware({
     "/api/slots/bulk",
     "/api/test-db",
     "/api/test-slots",
+    "/_next",
+    "/favicon.ico",
+    "/api/clerk-webhook",
   ],
   afterAuth(auth, req) {
     // Get admin token from cookies
@@ -68,7 +71,9 @@ export default authMiddleware({
         "/auth/sign-in",
         "/auth/sign-up",
         "/auth/error",
-        "/admin/login"
+        "/admin/login",
+        "/_next",
+        "/favicon.ico",
       ].includes(path);
       
       if (!isPublicRoute) {
@@ -85,5 +90,6 @@ export const config = {
     "/((?!.*\\..*|_next).*)",
     "/",
     "/(api|trpc)(.*)",
+    "/((?!api|trpc|_next/static|_next/image|favicon.ico).*)",
   ],
 }; 
