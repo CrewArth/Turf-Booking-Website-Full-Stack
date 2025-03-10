@@ -8,6 +8,16 @@ const nextConfig = {
         hostname: 'images.unsplash.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.clerk.dev',
+        pathname: '/**',
+      },
     ],
     unoptimized: false,
   },
@@ -47,7 +57,7 @@ const nextConfig = {
               script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.vercel.app;
               worker-src 'self' blob: https://*.clerk.accounts.dev;
               style-src 'self' 'unsafe-inline';
-              img-src 'self' blob: data: https://*.clerk.accounts.dev;
+              img-src 'self' blob: data: https://*.clerk.accounts.dev https://img.clerk.com https://images.clerk.dev https://*.clerk.dev;
               connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.dev https://*.razorpay.com https://api.razorpay.com;
               frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev;
             `.replace(/\s+/g, ' ').trim()
