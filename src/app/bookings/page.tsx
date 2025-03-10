@@ -63,16 +63,38 @@ export default function BookingsPage() {
       const response = await fetch('/api/bookings/user');
       
       if (!response.ok) {
-        throw new Error('Failed to fetch bookings');
+        const errorData = await response.json().catch(() => null);
+        console.error('Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
+        throw new Error(
+          errorData?.message || 
+          `Failed to fetch bookings (HTTP ${response.status})`
+        );
       }
 
       const data = await response.json();
       console.log('Bookings data:', data);
-      const bookingsData = Array.isArray(data) ? data : [];
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to fetch bookings');
+      }
+
+      const bookingsData = data.bookings || [];
+      console.log('Processing bookings:', {
+        count: bookingsData.length,
+        sample: bookingsData[0] ? {
+          id: bookingsData[0]._id,
+          date: bookingsData[0].date,
+          status: bookingsData[0].status
+        } : null
+      });
 
       // Fetch tickets for confirmed bookings
       const bookingsWithTickets = await Promise.all(
-        bookingsData.map(async (booking) => {
+        bookingsData.map(async (booking: Booking) => {
           if (booking.status === 'confirmed') {
             try {
               const ticketResponse = await fetch('/api/tickets', {
@@ -83,23 +105,38 @@ export default function BookingsPage() {
                 body: JSON.stringify({ bookingId: booking._id }),
               });
 
-              if (ticketResponse.ok) {
-                const ticket = await ticketResponse.json();
-                return { ...booking, ticket };
+              if (!ticketResponse.ok) {
+                console.error('Failed to fetch ticket:', {
+                  status: ticketResponse.status,
+                  bookingId: booking._id
+                });
+                return booking;
               }
+
+              const ticket = await ticketResponse.json();
+              return { ...booking, ticket };
             } catch (error) {
               console.error('Failed to fetch ticket for booking:', booking._id, error);
+              return booking;
             }
           }
           return booking;
         })
       );
 
-      console.log('Bookings with tickets:', bookingsWithTickets);
+      console.log('Bookings with tickets:', {
+        count: bookingsWithTickets.length,
+        withTickets: bookingsWithTickets.filter(b => b.ticket).length
+      });
       setBookings(bookingsWithTickets);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
-      setError('Failed to fetch your bookings. Please try again.');
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to fetch your bookings. Please try again.'
+      );
+      setBookings([]);
     } finally {
       setLoading(false);
     }
