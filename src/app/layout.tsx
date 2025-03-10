@@ -14,6 +14,22 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "TurfBook - Cricket Turf Booking",
   description: "Book your cricket turf online with ease. Choose from multiple locations and time slots.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'),
+  viewport: 'width=device-width, initial-scale=1',
+  icons: {
+    icon: '/favicon.ico',
+  },
+  other: {
+    'Content-Security-Policy': `
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com https://*.google.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: https://*.clerk.dev https://* blob:;
+      font-src 'self' https://fonts.gstatic.com;
+      frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.google.com https://www.google.com;
+      connect-src 'self' https://*.clerk.dev https://api.razorpay.com https://*.razorpay.com;
+    `.replace(/\s+/g, ' ').trim()
+  }
 };
 
 export default function RootLayout({

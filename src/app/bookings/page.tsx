@@ -116,12 +116,12 @@ export default function BookingsPage() {
       console.log('Bookings data:', data);
       
       if (!data.success) {
-        throw new Error(data.message || 'Failed to fetch bookings');
+        throw new Error(data.message || 'Fa iled to fetch bookings');
       }
 
       const bookingsData = data.bookings || [];
       setBookings(bookingsData);
-      toast.success('Bookings loaded successfully');
+      console.log('Bookings loaded successfully:', bookingsData);
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
       toast.error(
