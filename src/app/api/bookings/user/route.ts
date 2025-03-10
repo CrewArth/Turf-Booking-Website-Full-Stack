@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
 import dbConnect from '@/lib/db';
 import { Booking } from '@/models/Booking';
+import { Slot } from '@/models/Slot';
 
 export async function GET(req: Request) {
   try {
@@ -55,27 +56,41 @@ export async function GET(req: Request) {
       date: date || 'all'
     });
 
-    // Fetch bookings with populated slot details
+    // Ensure Slot model is registered before populating
     try {
+      // First get the bookings
       const bookings = await Booking.find(query)
-        .populate('slotId')
         .sort({ createdAt: -1 })
         .lean();
 
+      // Then manually populate the slot data
+      const populatedBookings = await Promise.all(
+        bookings.map(async (booking) => {
+          if (booking.slotId) {
+            const slot = await Slot.findById(booking.slotId).lean();
+            return {
+              ...booking,
+              slotId: slot
+            };
+          }
+          return booking;
+        })
+      );
+
       console.log('Bookings found:', {
-        count: bookings.length,
-        sampleBooking: bookings[0] ? {
-          id: bookings[0]._id,
-          date: bookings[0].date,
-          status: bookings[0].status,
-          slotId: bookings[0].slotId?._id
+        count: populatedBookings.length,
+        sampleBooking: populatedBookings[0] ? {
+          id: populatedBookings[0]._id,
+          date: populatedBookings[0].date,
+          status: populatedBookings[0].status,
+          slotId: populatedBookings[0].slotId?._id
         } : null
       });
 
       return NextResponse.json({
         success: true,
-        bookings,
-        count: bookings.length
+        bookings: populatedBookings,
+        count: populatedBookings.length
       });
     } catch (queryError) {
       console.error('Error querying bookings:', queryError);
