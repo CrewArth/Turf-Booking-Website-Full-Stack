@@ -167,10 +167,8 @@ export default function ScanPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Status</p>
-                    <p className={`font-medium ${
-                      scanResult.ticket.isUsed ? 'text-red-600' : 'text-green-600'
-                    }`}>
-                      {scanResult.ticket.isUsed ? 'Already Used' : 'Valid for Entry'}
+                    <p className={`font-medium ${scanResult.isValid ? 'text-green-600' : 'text-red-600'}`}>
+                      {scanResult.message}
                     </p>
                   </div>
                 </div>

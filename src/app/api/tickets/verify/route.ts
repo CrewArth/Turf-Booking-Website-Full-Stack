@@ -45,15 +45,6 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Check if ticket has already been used
-    if (ticket.isUsed) {
-      return NextResponse.json({
-        isValid: true,
-        ticket: ticket.toObject(),
-        message: 'Ticket has already been used'
-      });
-    }
-
     // Check if the ticket is for today
     const ticketDate = new Date(ticket.bookingId.date);
     const today = new Date();
@@ -67,7 +58,16 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Mark ticket as used
+    // Check if ticket has already been used
+    if (ticket.isUsed && ticket.usedAt) {
+      return NextResponse.json({
+        isValid: false,
+        ticket: ticket.toObject(),
+        message: `Ticket was already used on ${ticket.usedAt.toLocaleString()}`
+      });
+    }
+
+    // Mark ticket as used only during scanning
     ticket.isUsed = true;
     ticket.usedAt = new Date();
     await ticket.save();
