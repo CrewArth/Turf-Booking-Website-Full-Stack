@@ -8,33 +8,58 @@ export const maxDuration = 30; // 30 seconds timeout
 
 // Initialize Razorpay with proper error handling
 function initializeRazorpay() {
-  const key_id = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  // Log all available environment variables (without exposing secrets)
+  const envVars = {
+    NODE_ENV: process.env.NODE_ENV,
+    hasRazorpayKeyId: !!process.env.RAZORPAY_KEY_ID,
+    hasNextPublicRazorpayKeyId: !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+    hasRazorpayKeySecret: !!process.env.RAZORPAY_KEY_SECRET,
+  };
+  console.log('Environment variables check:', envVars);
+
+  // Get credentials with fallbacks
+  const key_id = process.env.RAZORPAY_KEY_ID;
   const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  const public_key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+
+  // Log credential availability
+  console.log('Razorpay Configuration Status:', {
+    hasKeyId: !!key_id,
+    hasKeySecret: !!key_secret,
+    hasPublicKey: !!public_key,
+    environment: process.env.NODE_ENV,
+    keyIdLength: key_id?.length,
+    keySecretLength: key_secret?.length
+  });
 
   if (!key_id || !key_secret) {
-    console.error('Razorpay Configuration Error:', {
-      hasKeyId: !!key_id,
-      hasKeySecret: !!key_secret,
-      environment: process.env.NODE_ENV
-    });
-    throw new Error('Razorpay credentials are not properly configured');
+    throw new Error(`Razorpay credentials missing: ${!key_id ? 'KEY_ID ' : ''}${!key_secret ? 'KEY_SECRET' : ''}`);
   }
 
   try {
-    return new Razorpay({
-      key_id,
-      key_secret,
+    const instance = new Razorpay({
+      key_id: key_id,
+      key_secret: key_secret,
     });
+
+    // Test the instance
+    if (!instance || !instance.orders) {
+      throw new Error('Razorpay instance creation failed');
+    }
+
+    console.log('Razorpay initialized successfully');
+    return instance;
   } catch (error) {
     console.error('Razorpay initialization error:', error);
-    throw new Error('Failed to initialize payment service');
+    throw new Error(`Failed to initialize payment service: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     // Get auth using server-side method
-    const { userId } = auth();
+    const session = auth();
+    const userId = session.userId;
     
     if (!userId) {
       return NextResponse.json(
@@ -94,14 +119,15 @@ export async function POST(req: NextRequest) {
       amount: orderAmount,
       currency,
       hasNotes: !!notes,
-      environment: process.env.NODE_ENV
+      environment: process.env.NODE_ENV,
+      userId: userId
     });
 
     // Create order
     const order = await razorpay.orders.create(orderOptions);
     
     // Get the appropriate key for client
-    const clientKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID;
+    const clientKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
     if (!clientKey) {
       throw new Error('Razorpay public key is not configured');
     }
