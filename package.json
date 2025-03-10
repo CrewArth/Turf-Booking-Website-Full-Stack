@@ -17,6 +17,7 @@
     "@types/mongoose": "^5.11.96",
     "@types/qrcode": "^1.5.5",
     "date-fns": "^3.3.1",
+    "html5-qrcode": "^2.3.8",
     "mongoose": "^8.12.1",
     "next": "14.1.0",
     "qrcode": "^1.5.4",
