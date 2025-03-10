@@ -7,9 +7,20 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
 
-    // Validate date parameter
+    // Connect to database
+    console.log('Connecting to database...');
+    await dbConnect();
+    console.log('Database connected successfully');
+
+    // If no date is provided, return all slots (for admin panel)
     if (!date) {
-      return NextResponse.json({ error: 'Date parameter is required' }, { status: 400 });
+      console.log('Fetching all slots for admin panel...');
+      const slots = await Slot.find()
+        .sort({ date: 1, time: 1 })
+        .lean();
+      
+      console.log(`Found ${slots.length} slots`);
+      return NextResponse.json(slots);
     }
 
     // Format date to YYYY-MM-DD
@@ -18,9 +29,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 });
     }
     const formattedDate = dateObj.toISOString().split('T')[0];
-
-    // Connect to database
-    await dbConnect();
 
     console.log('Querying slots with:', {
       date: formattedDate,
@@ -64,23 +72,16 @@ export async function GET(req: Request) {
       }))
     });
 
-    return NextResponse.json({ 
-      success: true,
-      slots,
-      date: formattedDate,
-      debug: {
-        totalSlotsForDate: allSlotsForDate.length,
-        filteredSlotsCount: slots.length,
-        requestedDate: formattedDate
-      }
-    });
+    return NextResponse.json(slots);
   } catch (error) {
     console.error('Error fetching slots:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to fetch slots',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return NextResponse.json(
+      { 
+        error: 'Failed to fetch slots',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
   }
 }
 

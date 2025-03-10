@@ -13,6 +13,7 @@ interface Slot {
   totalCapacity: number;
   isNight: boolean;
   isEnabled: boolean;
+  date: string;
 }
 
 function formatTime(time: string): string {
@@ -60,14 +61,37 @@ export default function AdminSlotsPage() {
   const fetchSlots = async () => {
     try {
       setLoading(true);
+      console.log('Fetching slots...');
       const response = await fetch('/api/slots');
+      
       if (!response.ok) {
         throw new Error('Failed to fetch slots');
       }
+      
       const data = await response.json();
-      setSlots(Array.isArray(data) ? data : []);
+      console.log('Slots data:', {
+        count: data.length,
+        sample: data[0] ? {
+          id: data[0]._id,
+          time: data[0].time,
+          date: data[0].date,
+          enabled: data[0].isEnabled
+        } : null
+      });
+      
+      // Sort slots by date and time
+      const sortedSlots = Array.isArray(data) ? data.sort((a, b) => {
+        const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+        if (dateCompare === 0) {
+          return a.time.localeCompare(b.time);
+        }
+        return dateCompare;
+      }) : [];
+      
+      setSlots(sortedSlots);
     } catch (error) {
       console.error('Failed to fetch slots:', error);
+      toast.error('Failed to fetch slots. Please try again.');
       setSlots([]); // Set empty array on error
     } finally {
       setLoading(false);
@@ -419,71 +443,78 @@ export default function AdminSlotsPage() {
       <div className="mt-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Slots</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {slots.map((slot) => (
-            <div
-              key={slot._id}
-              className={`bg-white rounded-lg shadow-md overflow-hidden border ${
-                slot.isEnabled ? 'border-green-200' : 'border-red-200'
-              }`}
-            >
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {formatTime(slot.time)}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {slot.isNight ? 'Night Slot' : 'Day Slot'}
-                    </p>
-                  </div>
-                  <div className="relative">
-                    <button
-                      onClick={() => setOpenDropdownId(openDropdownId === slot._id ? null : slot._id)}
-                      className="p-1.5 hover:bg-gray-100 rounded-full"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
-                    {openDropdownId === slot._id && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                        <div className="py-1">
-                          <button
-                            onClick={() => openUpdateModal(slot)}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          >
-                            Update Details
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSlot(slot._id)}
-                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                          >
-                            Delete Slot
-                          </button>
+          {slots.length === 0 ? (
+            <div className="col-span-full text-center py-8">
+              <p className="text-gray-500">No slots available. Create some slots to get started.</p>
+            </div>
+          ) : (
+            slots.map((slot) => (
+              <div
+                key={slot._id}
+                className={`bg-white rounded-lg shadow-md overflow-hidden border relative ${
+                  slot.isEnabled ? 'border-green-200' : 'border-red-200'
+                }`}
+              >
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {format(new Date(slot.date), 'MMM d, yyyy')} - {formatTime(slot.time)}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {slot.isNight ? 'Night Slot' : 'Day Slot'}
+                      </p>
+                    </div>
+                    <div className="relative">
+                      <button
+                        onClick={() => setOpenDropdownId(openDropdownId === slot._id ? null : slot._id)}
+                        className="p-1.5 hover:bg-gray-100 rounded-full"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
+                      {openDropdownId === slot._id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                          <div className="py-1">
+                            <button
+                              onClick={() => openUpdateModal(slot)}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              Update Details
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSlot(slot._id)}
+                              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                            >
+                              Delete Slot
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Price:</span>
-                    <span className="font-medium text-gray-900">₹{slot.price}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Capacity:</span>
-                    <span className="font-medium text-gray-900">{slot.totalCapacity}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Status:</span>
-                    <span className={`font-medium ${slot.isEnabled ? 'text-green-600' : 'text-red-600'}`}>
-                      {slot.isEnabled ? 'Active' : 'Inactive'}
-                    </span>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Price:</span>
+                      <span className="font-medium text-gray-900">₹{slot.price}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Capacity:</span>
+                      <span className="font-medium text-gray-900">{slot.totalCapacity}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Status:</span>
+                      <span className={`font-medium ${slot.isEnabled ? 'text-green-600' : 'text-red-600'}`}>
+                        {slot.isEnabled ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
