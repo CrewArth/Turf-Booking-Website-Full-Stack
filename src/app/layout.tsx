@@ -53,7 +53,27 @@ export default function RootLayout({
     >
       <html lang="en">
         <body className={`${inter.className} antialiased bg-white flex flex-col min-h-screen`}>
-          <Toaster position="top-right" />
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#333',
+                color: '#fff',
+              },
+              success: {
+                style: {
+                  background: '#22c55e',
+                },
+              },
+              error: {
+                style: {
+                  background: '#ef4444',
+                },
+                duration: 4000,
+              },
+            }}
+          />
           <Navbar />
           <main className="pt-16 flex-grow">
             {children}

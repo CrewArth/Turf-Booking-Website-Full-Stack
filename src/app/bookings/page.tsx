@@ -5,6 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import Ticket from '@/components/Ticket';
+import { toast } from 'react-hot-toast';
 
 interface Slot {
   _id: string;
@@ -55,6 +56,42 @@ export default function BookingsPage() {
     fetchBookings();
   }, []);
 
+  const handleViewTicket = async (booking: Booking) => {
+    try {
+      setSelectedBooking(booking);
+      setShowTicket(true);
+      
+      // Log for debugging
+      console.log('Opening ticket:', {
+        bookingId: booking._id,
+        hasTicket: !!booking.ticket,
+        ticketData: booking.ticket
+      });
+
+      if (!booking.ticket) {
+        // Try to fetch ticket if not already present
+        const ticketResponse = await fetch('/api/tickets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ bookingId: booking._id }),
+        });
+
+        if (!ticketResponse.ok) {
+          throw new Error('Failed to fetch ticket');
+        }
+
+        const ticket = await ticketResponse.json();
+        setSelectedBooking({ ...booking, ticket });
+      }
+    } catch (error) {
+      console.error('Error viewing ticket:', error);
+      toast.error('Unable to view ticket. Please try again.');
+      setShowTicket(false);
+    }
+  };
+
   const fetchBookings = async () => {
     try {
       setLoading(true);
@@ -83,55 +120,11 @@ export default function BookingsPage() {
       }
 
       const bookingsData = data.bookings || [];
-      console.log('Processing bookings:', {
-        count: bookingsData.length,
-        sample: bookingsData[0] ? {
-          id: bookingsData[0]._id,
-          date: bookingsData[0].date,
-          status: bookingsData[0].status
-        } : null
-      });
-
-      // Fetch tickets for confirmed bookings
-      const bookingsWithTickets = await Promise.all(
-        bookingsData.map(async (booking: Booking) => {
-          if (booking.status === 'confirmed') {
-            try {
-              const ticketResponse = await fetch('/api/tickets', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ bookingId: booking._id }),
-              });
-
-              if (!ticketResponse.ok) {
-                console.error('Failed to fetch ticket:', {
-                  status: ticketResponse.status,
-                  bookingId: booking._id
-                });
-                return booking;
-              }
-
-              const ticket = await ticketResponse.json();
-              return { ...booking, ticket };
-            } catch (error) {
-              console.error('Failed to fetch ticket for booking:', booking._id, error);
-              return booking;
-            }
-          }
-          return booking;
-        })
-      );
-
-      console.log('Bookings with tickets:', {
-        count: bookingsWithTickets.length,
-        withTickets: bookingsWithTickets.filter(b => b.ticket).length
-      });
-      setBookings(bookingsWithTickets);
+      setBookings(bookingsData);
+      toast.success('Bookings loaded successfully');
     } catch (error) {
       console.error('Failed to fetch bookings:', error);
-      setError(
+      toast.error(
         error instanceof Error 
           ? error.message 
           : 'Failed to fetch your bookings. Please try again.'
@@ -140,11 +133,6 @@ export default function BookingsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleViewTicket = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setShowTicket(true);
   };
 
   if (loading) {
@@ -275,18 +263,28 @@ export default function BookingsPage() {
 
       {/* Ticket Modal */}
       {showTicket && selectedBooking?.ticket && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto"
+          onClick={(e) => {
+            // Close modal when clicking outside
+            if (e.target === e.currentTarget) {
+              setShowTicket(false);
+            }
+          }}
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full my-8">
             <div className="p-4 relative max-h-[80vh] overflow-y-auto">
               <button
                 onClick={() => setShowTicket(false)}
-                className="absolute right-4 top-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1"
+                className="absolute right-4 top-4 text-gray-500 hover:text-gray-700 z-10 bg-white rounded-full p-1 shadow-md"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <Ticket ticket={selectedBooking.ticket} />
+              <div className="pt-8">
+                <Ticket ticket={selectedBooking.ticket} />
+              </div>
             </div>
           </div>
         </div>
