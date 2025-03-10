@@ -1,47 +1,73 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs';
 import dbConnect from '@/lib/db';
 import { Booking } from '@/models/Booking';
-import { auth } from '@clerk/nextjs';
 
 export async function GET(req: Request) {
   try {
+    // Get the authenticated user
     const { userId } = auth();
     
-    // Check if user is authenticated
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized - Please sign in' }, { status: 401 });
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Authentication required',
+          message: 'Please sign in to view your bookings'
+        },
+        { status: 401 }
+      );
     }
 
+    // Connect to database
+    console.log('Connecting to database for user bookings...');
     await dbConnect();
 
-    console.log('Fetching bookings for user:', userId);
+    // Get query parameters
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status');
+    const date = searchParams.get('date');
 
-    // Fetch user's bookings with populated slot information
-    const bookings = await Booking.find({ userId })
+    // Build query
+    const query: any = { userId };
+    if (status) query.status = status;
+    if (date) query.date = date;
+
+    console.log('Fetching bookings with query:', {
+      userId,
+      status: status || 'all',
+      date: date || 'all'
+    });
+
+    // Fetch bookings with populated slot details
+    const bookings = await Booking.find(query)
       .populate('slotId')
-      .sort({ date: -1 }); // Most recent bookings first
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // Update status for bookings with payment details
-    const updatedBookings = await Promise.all(
-      bookings.map(async (booking) => {
-        if (booking.paymentId && booking.orderId && booking.signature && booking.status === 'pending') {
-          booking.status = 'confirmed';
-          await booking.save();
-        }
-        return booking;
-      })
-    );
+    console.log('Bookings found:', {
+      count: bookings.length,
+      sampleBooking: bookings[0] ? {
+        id: bookings[0]._id,
+        date: bookings[0].date,
+        status: bookings[0].status
+      } : null
+    });
 
-    console.log('Found bookings:', updatedBookings);
-
-    return NextResponse.json(updatedBookings);
+    return NextResponse.json({
+      success: true,
+      bookings,
+      count: bookings.length
+    });
   } catch (error) {
     console.error('Error fetching user bookings:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to fetch bookings', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      }, 
+      {
+        success: false,
+        error: 'Failed to fetch bookings',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
+      },
       { status: 500 }
     );
   }

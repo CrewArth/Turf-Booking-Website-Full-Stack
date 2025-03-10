@@ -25,6 +25,8 @@ export default authMiddleware({
     "/api/slots",
     "/api/slots/bulk",
     "/api/gallery",
+    "/api/test-db",
+    "/api/test-slots",
   ],
   ignoredRoutes: [
     "/api/admin/auth",
@@ -49,12 +51,16 @@ export default authMiddleware({
       }
     }
 
-    // Allow payment routes only for authenticated users
-    if (path.startsWith('/api/payments/') && !auth.userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+    // Handle protected API routes
+    if (path.startsWith('/api/')) {
+      // Allow payment and booking routes only for authenticated users
+      if ((path.startsWith('/api/payments/') || path.startsWith('/api/bookings/')) && !auth.userId) {
+        return NextResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+      return NextResponse.next();
     }
 
     // Prevent authenticated users from accessing auth pages
@@ -63,7 +69,7 @@ export default authMiddleware({
     }
 
     // Check if trying to access protected routes without authentication
-    if (!auth.userId && !path.startsWith('/api/')) {
+    if (!auth.userId) {
       const isPublicRoute = [
         "/",
         "/gallery",
