@@ -23,10 +23,10 @@ export default function Contact() {
               <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">Phone</h3>
               <div className="text-center">
                 <a 
-                  href="tel:+917698999917" 
+                  href="tel:+917069030750" 
                   className="text-lg text-green-600 hover:text-green-700 font-medium"
                 >
-                  +91 76989 99917
+                  +91 7069030750
                 </a>
                 <p className="mt-2 text-sm text-gray-600">Available 7 days a week</p>
               </div>
