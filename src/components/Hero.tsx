@@ -30,7 +30,8 @@ export default function Hero() {
             <span className="text-green-600"> Cricket Turf</span>
           </h1>
           <p className="text-xl text-gray-700 mb-8">
-            Experience premium cricket facilities at your convenience. Book your slot now and play at the best turfs in town.
+          Gujarat's largest box turf is now open in Vadodara.
+          Get ready to play hard on professional grounds with 50 mm FIFA quality turf.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             {isLoaded && (
