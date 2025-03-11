@@ -1,4 +1,5 @@
 import Razorpay from 'razorpay';
+import crypto from 'crypto';
 
 // Only initialize Razorpay instance on the server
 const isServer = typeof window === 'undefined';
@@ -158,4 +159,35 @@ export async function createPaymentOrder(options: PaymentOptions) {
     console.error('Payment order creation failed:', error);
     throw error;
   }
-} 
+}
+
+interface VerifyPaymentParams {
+  orderId: string;
+  paymentId: string;
+  signature: string;
+}
+
+export const verifyRazorpayPayment = ({ orderId, paymentId, signature }: VerifyPaymentParams): boolean => {
+  try {
+    // Get the secret key from environment variables
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) {
+      console.error('RAZORPAY_KEY_SECRET is not defined');
+      return false;
+    }
+
+    // Create the signature verification string
+    const verificationString = `${orderId}|${paymentId}`;
+
+    // Create an HMAC SHA256 hash using the secret
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(verificationString);
+    const generatedSignature = hmac.digest('hex');
+
+    // Compare the generated signature with the received signature
+    return generatedSignature === signature;
+  } catch (error) {
+    console.error('Error verifying Razorpay payment:', error);
+    return false;
+  }
+}; 

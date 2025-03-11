@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -13,11 +13,15 @@ const inter = Inter({
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: "TurfBook - Cricket Turf Booking",
   description: "Book your cricket turf online with ease. Choose from multiple locations and time slots.",
   metadataBase: new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`),
-  viewport: 'width=device-width, initial-scale=1',
   icons: {
     icon: '/favicon.ico',
   },
