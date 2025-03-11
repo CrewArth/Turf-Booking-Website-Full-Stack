@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { format, addDays } from 'date-fns';
 import { loadRazorpayScript, createPaymentOrder } from '@/lib/razorpay';
+import { toast } from 'react-hot-toast';
 
 interface Slot {
   _id: string;
@@ -313,21 +314,32 @@ export default function BookingPage() {
       setIsProcessing(true);
       setPaymentError(null);
 
-      // Load Razorpay script
-      const isScriptLoaded = await loadRazorpayScript();
-      if (!isScriptLoaded) {
-        throw new Error('Failed to load payment gateway');
+      // Load Razorpay script with retry
+      let isScriptLoaded = false;
+      for (let i = 0; i < 3; i++) {
+        isScriptLoaded = await loadRazorpayScript();
+        if (isScriptLoaded) break;
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
       }
 
-      // Create payment order
-      const orderResponse = await createPaymentOrder({
-        amount: selectedSlot.price,
-        notes: {
-          slotId: selectedSlot._id,
-          date: format(selectedDate, 'yyyy-MM-dd'),
-          time: selectedSlot.time,
-        },
-      });
+      if (!isScriptLoaded) {
+        throw new Error('Failed to load payment gateway. Please check your internet connection and try again.');
+      }
+
+      // Create payment order with timeout
+      const orderResponse = await Promise.race([
+        createPaymentOrder({
+          amount: selectedSlot.price,
+          notes: {
+            slotId: selectedSlot._id,
+            date: format(selectedDate, 'yyyy-MM-dd'),
+            time: selectedSlot.time,
+          },
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Payment request timed out. Please try again.')), 30000)
+        )
+      ]);
 
       // Initialize Razorpay payment
       const options = {
@@ -343,55 +355,75 @@ export default function BookingPage() {
         },
         handler: async function (response: any) {
           try {
-            console.log('Payment response:', response);
+            console.log('Payment successful, creating booking...');
             
-            // Create booking with payment details
-            const bookingResponse = await fetch('/api/bookings', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                slotId: selectedSlot._id,
-                date: format(selectedDate, 'yyyy-MM-dd'),
-                paymentId: response.razorpay_payment_id,
-                orderId: response.razorpay_order_id,
-                signature: response.razorpay_signature,
-                amount: selectedSlot.price,
+            // Create booking with timeout
+            const bookingResponse = (await Promise.race([
+              fetch('/api/bookings', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  slotId: selectedSlot._id,
+                  date: format(selectedDate, 'yyyy-MM-dd'),
+                  paymentId: response.razorpay_payment_id,
+                  orderId: response.razorpay_order_id,
+                  signature: response.razorpay_signature,
+                  amount: selectedSlot.price,
+                }),
               }),
-            });
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Booking request timed out. Please check your bookings page.')), 30000)
+              )
+            ])) as Response;
 
             if (!bookingResponse.ok) {
               const errorData = await bookingResponse.json();
-              throw new Error(errorData.error || 'Booking failed');
+              console.error('Booking failed:', errorData);
+              throw new Error(errorData.error || errorData.details || 'Failed to complete booking');
             }
 
             const bookingData = await bookingResponse.json();
             console.log('Booking created:', bookingData);
 
-            // Generate ticket
-            const ticketResponse = await fetch('/api/tickets', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                bookingId: bookingData.booking._id,
-              }),
-            });
+            // Generate ticket with timeout
+            try {
+              const ticketResponse = (await Promise.race([
+                fetch('/api/tickets', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    bookingId: bookingData.booking._id,
+                  }),
+                }),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Ticket generation timed out')), 30000)
+                )
+              ])) as Response;
 
-            if (!ticketResponse.ok) {
-              console.error('Failed to generate ticket:', await ticketResponse.text());
+              if (!ticketResponse.ok) {
+                console.error('Failed to generate ticket:', await ticketResponse.text());
+                // Don't throw error here, just log it
+              }
+            } catch (ticketError) {
+              console.error('Ticket generation error:', ticketError);
+              // Don't throw error here, just log it
             }
 
             // Show success message and redirect
-            alert('Booking confirmed successfully! Your ticket has been generated.');
+            toast.success('Booking confirmed successfully!');
             window.location.href = '/bookings';
           } catch (error) {
             console.error('Booking error:', error);
-            setPaymentError('Failed to complete booking. Please try again.');
+            toast.error(error instanceof Error ? error.message : 'Failed to complete booking. Please check your bookings page.');
             // Refresh slots to show updated availability
-            await Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
+            await Promise.all([
+              fetchSlots(format(selectedDate, 'yyyy-MM-dd')),
+              fetchBookings(format(selectedDate, 'yyyy-MM-dd'))
+            ]);
           } finally {
             setIsProcessing(false);
           }
@@ -399,19 +431,33 @@ export default function BookingPage() {
         modal: {
           ondismiss: function() {
             setIsProcessing(false);
+            setPaymentError(null);
             // Refresh slots to show updated availability
-            Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
+            Promise.all([
+              fetchSlots(format(selectedDate, 'yyyy-MM-dd')),
+              fetchBookings(format(selectedDate, 'yyyy-MM-dd'))
+            ]);
           },
           escape: true,
+          handleback: function() {
+            // Handle back button press on mobile
+            setIsProcessing(false);
+            setPaymentError(null);
+          },
         },
         theme: {
           color: '#16a34a',
-        }
+        },
+        retry: {
+          enabled: true,
+          max_count: 3,
+        },
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function(response: any) {
         console.error('Payment failed:', response.error);
+        toast.error(response.error.description || 'Payment failed. Please try again.');
         setPaymentError(response.error.description || 'Payment failed. Please try again.');
         setIsProcessing(false);
       });
@@ -419,10 +465,14 @@ export default function BookingPage() {
       rzp.open();
     } catch (error) {
       console.error('Payment initialization error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to initialize payment');
       setPaymentError(error instanceof Error ? error.message : 'Failed to initialize payment');
       setIsProcessing(false);
       // Refresh slots to show updated availability
-      await Promise.all([fetchSlots(format(selectedDate, 'yyyy-MM-dd')), fetchBookings(format(selectedDate, 'yyyy-MM-dd'))]);
+      await Promise.all([
+        fetchSlots(format(selectedDate, 'yyyy-MM-dd')),
+        fetchBookings(format(selectedDate, 'yyyy-MM-dd'))
+      ]);
     }
   };
 
