@@ -45,19 +45,6 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Check if the ticket is for today
-    const ticketDate = new Date(ticket.bookingId.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    ticketDate.setHours(0, 0, 0, 0);
-
-    if (ticketDate.getTime() !== today.getTime()) {
-      return NextResponse.json({ 
-        isValid: false,
-        message: ticketDate < today ? 'Ticket has expired' : 'Ticket is for a future date'
-      }, { status: 400 });
-    }
-
     // Check if ticket has already been used
     if (ticket.isUsed && ticket.usedAt) {
       return NextResponse.json({
@@ -67,7 +54,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // Mark ticket as used only during scanning
+    // Mark ticket as used
     ticket.isUsed = true;
     ticket.usedAt = new Date();
     await ticket.save();
