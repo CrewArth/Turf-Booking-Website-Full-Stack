@@ -188,12 +188,29 @@ export default function Navbar() {
                   >
                     My Bookings
                   </Link>
-                  <div className="px-3 py-2" onClick={closeMenu}>
-                    <UserButton afterSignOutUrl="/" />
+                  <div 
+                    className="px-3 py-2" 
+                    onClick={(e) => {
+                      // Stop event propagation
+                      e.stopPropagation();
+                      // Don't close menu when clicking UserButton
+                    }}
+                  >
+                    <div className="h-10 flex items-center">
+                      <UserButton 
+                        afterSignOutUrl="/"
+                        appearance={{
+                          elements: {
+                            rootBox: "h-10",
+                            avatarBox: "h-10 w-10",
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                 </>
               ) : (
-                <div className="px-3 py-2" onClick={closeMenu}>
+                <div className="px-3 py-2">
                   <SignInButton mode="modal">
                     <button className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
                       Login
