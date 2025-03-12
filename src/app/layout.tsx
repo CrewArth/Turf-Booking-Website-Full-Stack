@@ -23,7 +23,12 @@ export const metadata: Metadata = {
   description: "Book your cricket turf online with ease. Choose from multiple locations and time slots.",
   metadataBase: new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`),
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      {
+        url: '/favicon.ico',
+        sizes: 'any',
+      }
+    ],
   },
   other: {
     'Content-Security-Policy': `
