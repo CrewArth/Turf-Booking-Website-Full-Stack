@@ -60,37 +60,38 @@ export async function GET(req: Request) {
     try {
       // First get the bookings
       const bookings = await Booking.find(query)
+        .populate({
+          path: 'slotId',
+          select: '_id time price totalCapacity isNight isEnabled',
+        })
         .sort({ createdAt: -1 })
         .lean();
 
-      // Then manually populate the slot data
-      const populatedBookings = await Promise.all(
-        bookings.map(async (booking) => {
-          if (booking.slotId) {
-            const slot = await Slot.findById(booking.slotId).lean();
-            return {
-              ...booking,
-              slotId: slot
-            };
-          }
-          return booking;
-        })
-      );
+      // Filter out any bookings with null slotId
+      const validBookings = bookings.filter(booking => booking.slotId);
+
+      if (validBookings.length < bookings.length) {
+        console.warn('Some bookings have missing slot data:', {
+          totalBookings: bookings.length,
+          validBookings: validBookings.length,
+          missingSlots: bookings.length - validBookings.length
+        });
+      }
 
       console.log('Bookings found:', {
-        count: populatedBookings.length,
-        sampleBooking: populatedBookings[0] ? {
-          id: populatedBookings[0]._id,
-          date: populatedBookings[0].date,
-          status: populatedBookings[0].status,
-          slotId: populatedBookings[0].slotId?._id
+        count: validBookings.length,
+        sampleBooking: validBookings[0] ? {
+          id: validBookings[0]._id,
+          date: validBookings[0].date,
+          status: validBookings[0].status,
+          slotId: validBookings[0].slotId?._id
         } : null
       });
 
       return NextResponse.json({
         success: true,
-        bookings: populatedBookings,
-        count: populatedBookings.length
+        bookings: validBookings,
+        count: validBookings.length
       });
     } catch (queryError) {
       console.error('Error querying bookings:', queryError);

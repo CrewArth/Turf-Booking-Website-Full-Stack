@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create order options
-    const orderAmount = Math.round(amount * 100); // Convert to paise
+    const orderAmount = Math.round(amount); // Convert to paise
     const orderOptions = {
       amount: orderAmount,
       currency,

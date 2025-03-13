@@ -212,24 +212,37 @@ export default function BookingsPage() {
                 >
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-3">
-                      {booking.slotId.isNight ? (
-                        <span className="text-2xl">🌙</span>
+                      {booking.slotId ? (
+                        <>
+                          {booking.slotId.isNight ? (
+                            <span className="text-2xl">🌙</span>
+                          ) : (
+                            <span className="text-2xl">☀️</span>
+                          )}
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {format(new Date(booking.date), 'MMMM d, yyyy')}
+                            </h3>
+                            <p className="text-gray-600">{formatTime(booking.slotId.time)}</p>
+                          </div>
+                        </>
                       ) : (
-                        <span className="text-2xl">☀️</span>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {format(new Date(booking.date), 'MMMM d, yyyy')}
+                          </h3>
+                          <p className="text-gray-600">Slot information unavailable</p>
+                        </div>
                       )}
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {format(new Date(booking.date), 'MMMM d, yyyy')}
-                        </h3>
-                        <p className="text-gray-600">{formatTime(booking.slotId.time)}</p>
-                      </div>
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600">Price</p>
-                        <p className="text-lg font-bold text-gray-900">₹{booking.slotId.price}</p>
-                      </div>
+                      {booking.slotId && (
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Price</p>
+                          <p className="text-lg font-bold text-gray-900">₹{booking.slotId.price}</p>
+                        </div>
+                      )}
                       <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                         booking.status === 'confirmed'
                           ? 'bg-green-100 text-green-800'
@@ -241,7 +254,7 @@ export default function BookingsPage() {
                       </div>
                     </div>
 
-                    {booking.status === 'confirmed' && (
+                    {booking.status === 'confirmed' && booking.slotId && (
                       <button
                         onClick={() => handleViewTicket(booking)}
                         className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"

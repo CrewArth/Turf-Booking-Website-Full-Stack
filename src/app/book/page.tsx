@@ -333,7 +333,7 @@ export default function BookingPage() {
 
       // Create payment order
       const orderData = await createPaymentOrder({
-        amount: selectedSlot.price,
+        amount: selectedSlot.price * 100, // Convert to paise
         currency: 'INR',
         notes: {
           slotId: selectedSlot._id,
