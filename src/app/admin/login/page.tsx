@@ -2,30 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Check if admin is already logged in
     const checkAdminStatus = async () => {
       try {
         const response = await fetch('/api/admin/auth/check');
         const data = await response.json();
-        if (data.isAdmin) {
-          router.push('/admin/slots');
+        
+        if (response.ok && data.isAdmin) {
+          const redirectUrl = searchParams.get('redirect_url') || '/admin/slots';
+          router.push(redirectUrl);
         }
       } catch (error) {
         console.error('Error checking admin status:', error);
+      } finally {
+        setIsChecking(false);
       }
     };
     checkAdminStatus();
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +38,6 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      console.log('Attempting login with:', { email }); // Debug log
-
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: {
@@ -44,27 +47,35 @@ export default function AdminLogin() {
       });
 
       const data = await response.json();
-      console.log('Login response:', data); // Debug log
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Authentication failed');
+      }
 
       if (data.success) {
-        // Get the redirect URL from query params or default to /admin/slots
+        toast.success('Login successful');
         const redirectUrl = searchParams.get('redirect_url') || '/admin/slots';
-        
-        // Add a small delay to ensure the cookie is set
-        setTimeout(() => {
-          router.push(redirectUrl);
-          router.refresh();
-        }, 100);
+        router.push(redirectUrl);
+        router.refresh();
       } else {
-        setError(data.message || data.error || 'Authentication failed');
+        setError(data.message || 'Invalid credentials');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('Something went wrong. Please try again.');
+      setError(error instanceof Error ? error.message : 'Authentication failed');
+      toast.error('Login failed');
     } finally {
       setLoading(false);
     }
   };
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -94,7 +105,6 @@ export default function AdminLogin() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500"
-                  placeholder="admin@example.com"
                 />
               </div>
             </div>
