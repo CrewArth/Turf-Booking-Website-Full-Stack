@@ -7,10 +7,18 @@ export async function POST(req: Request) {
 
     // Validate input
     if (!email || !password) {
-      return NextResponse.json({
-        success: false,
-        message: 'Email and password are required'
-      }, { status: 400 });
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          message: 'Email and password are required'
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
     }
 
     // Get admin credentials from environment variables
@@ -20,69 +28,122 @@ export async function POST(req: Request) {
     // Validate admin credentials are configured
     if (!adminEmail || !adminPassword) {
       console.error('Admin credentials not configured');
-      return NextResponse.json({
-        success: false,
-        message: 'Admin authentication not configured'
-      }, { status: 500 });
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          message: 'Admin authentication not configured'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
     }
 
     // Check credentials
     if (email !== adminEmail || password !== adminPassword) {
-      return NextResponse.json({
-        success: false,
-        message: 'Invalid credentials'
-      }, { status: 401 });
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          message: 'Invalid credentials'
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
     }
 
-    // Set secure cookies
-    const cookieStore = cookies();
-    
-    // Set admin token cookie (HTTP only for security)
-    cookieStore.set('admin_token', 'true', {
+    // Create response with cookies
+    const response = new NextResponse(
+      JSON.stringify({
+        success: true,
+        message: 'Authentication successful'
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+
+    // Set cookies on the response
+    const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       path: '/',
-    });
+      // Set expiry to 24 hours
+      maxAge: 60 * 60 * 24,
+    };
 
-    // Set admin email cookie
-    cookieStore.set('admin_email', email, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+    response.cookies.set('admin_token', 'true', cookieOptions);
+    response.cookies.set('admin_email', email, cookieOptions);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Authentication successful'
-    });
+    return response;
   } catch (error) {
     console.error('Admin authentication error:', error);
-    return NextResponse.json({
-      success: false,
-      message: 'Authentication failed'
-    }, { status: 500 });
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        message: 'Authentication failed'
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
   }
 }
 
 export async function DELETE() {
   try {
-    const cookieStore = cookies();
-    
-    // Clear admin cookies
-    cookieStore.delete('admin_token');
-    cookieStore.delete('admin_email');
+    const response = new NextResponse(
+      JSON.stringify({
+        success: true,
+        message: 'Logged out successfully'
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
 
-    return NextResponse.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
+    // Clear cookies with same options
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: 0, // Expire immediately
+    };
+
+    response.cookies.set('admin_token', '', cookieOptions);
+    response.cookies.set('admin_email', '', cookieOptions);
+
+    return response;
   } catch (error) {
     console.error('Logout error:', error);
-    return NextResponse.json({
-      success: false,
-      message: 'Failed to logout'
-    }, { status: 500 });
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        message: 'Failed to logout'
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
   }
 } 

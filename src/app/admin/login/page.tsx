@@ -16,11 +16,18 @@ export default function AdminLogin() {
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        const response = await fetch('/api/admin/auth/check');
+        const response = await fetch('/api/admin/auth/check', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Important for cookies
+        });
+
         const data = await response.json();
         
         if (response.ok && data.isAdmin) {
-          const redirectUrl = searchParams.get('redirect_url') || '/admin/slots';
+          const redirectUrl = searchParams?.get('redirect_url') || '/admin/slots';
           router.push(redirectUrl);
         }
       } catch (error) {
@@ -29,7 +36,16 @@ export default function AdminLogin() {
         setIsChecking(false);
       }
     };
-    checkAdminStatus();
+
+    // Only check status if we're mounted
+    let mounted = true;
+    if (mounted) {
+      checkAdminStatus();
+    }
+
+    return () => {
+      mounted = false;
+    };
   }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,7 +59,11 @@ export default function AdminLogin() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        credentials: 'include', // Important for cookies
+        body: JSON.stringify({ 
+          email: email.trim(), 
+          password: password.trim() 
+        }),
       });
 
       const data = await response.json();
@@ -54,21 +74,27 @@ export default function AdminLogin() {
 
       if (data.success) {
         toast.success('Login successful');
-        const redirectUrl = searchParams.get('redirect_url') || '/admin/slots';
-        router.push(redirectUrl);
-        router.refresh();
+        // Small delay to ensure cookies are set
+        setTimeout(() => {
+          const redirectUrl = searchParams?.get('redirect_url') || '/admin/slots';
+          router.push(redirectUrl);
+          router.refresh();
+        }, 100);
       } else {
         setError(data.message || 'Invalid credentials');
+        toast.error(data.message || 'Invalid credentials');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error instanceof Error ? error.message : 'Authentication failed');
-      toast.error('Login failed');
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  // Show loading state
   if (isChecking) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

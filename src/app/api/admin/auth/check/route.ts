@@ -9,29 +9,62 @@ export async function GET() {
 
     // Check both token and email
     if (!adminToken?.value || !adminEmail?.value) {
-      return NextResponse.json({
-        isAdmin: false,
-        message: 'Admin authentication required'
-      }, { status: 401 });
+      return new NextResponse(
+        JSON.stringify({
+          isAdmin: false,
+          message: 'Admin authentication required'
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
     }
 
     // Verify against environment variable
     const validAdminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    if (adminEmail.value !== validAdminEmail) {
-      return NextResponse.json({
-        isAdmin: false,
-        message: 'Invalid admin credentials'
-      }, { status: 401 });
+    if (!validAdminEmail || adminEmail.value !== validAdminEmail) {
+      return new NextResponse(
+        JSON.stringify({
+          isAdmin: false,
+          message: 'Invalid admin credentials'
+        }),
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
     }
 
-    return NextResponse.json({
-      isAdmin: true
-    });
+    return new NextResponse(
+      JSON.stringify({
+        isAdmin: true,
+        email: adminEmail.value
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
   } catch (error) {
     console.error('Error checking admin status:', error);
-    return NextResponse.json({
-      isAdmin: false,
-      message: 'Error checking admin status'
-    }, { status: 500 });
+    return new NextResponse(
+      JSON.stringify({
+        isAdmin: false,
+        message: 'Error checking admin status'
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
   }
 } 
