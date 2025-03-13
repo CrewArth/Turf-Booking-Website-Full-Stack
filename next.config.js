@@ -55,12 +55,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: `
               default-src 'self';
-              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.clerk.accounts.dev https://*.razorpay.com https://checkout.razorpay.com;
+              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.clerk.accounts.dev https://*.razorpay.com https://checkout.razorpay.com https://*.google.com;
+              worker-src 'self' blob: https://*.clerk.accounts.dev https://*.clerk.dev;
               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.dev;
               img-src 'self' blob: data: https://*.clerk.accounts.dev https://img.clerk.com https://images.clerk.dev https://*.clerk.dev https://res.cloudinary.com;
               connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.dev https://*.clerk.dev https://*.razorpay.com https://api.razorpay.com https://res.cloudinary.com;
-              frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev;
-              font-src 'self' data: https://*.clerk.dev;
+              frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.google.com https://www.google.com;
+              font-src 'self' data: https://*.clerk.dev https://fonts.gstatic.com;
               manifest-src 'self';
             `.replace(/\s+/g, ' ').trim()
           }
