@@ -19,6 +19,19 @@ function isStaticAsset(pathname: string) {
          pathname.startsWith('/__clerk');
 }
 
+// Check if the path is a public route
+function isPublicRoute(pathname: string) {
+  return [
+    "/",
+    "/gallery",
+    "/contact",
+    "/auth/sign-in",
+    "/auth/sign-up",
+    "/auth/error",
+    "/admin/login",
+  ].includes(pathname);
+}
+
 export default authMiddleware({
   debug: process.env.NODE_ENV === 'development',
   publicRoutes: [
@@ -52,11 +65,17 @@ export default authMiddleware({
     "/__clerk",
   ],
   afterAuth(auth, req) {
+    // Get the pathname from the URL
     const url = new URL(req.url);
     const path = url.pathname;
     
     // Skip middleware for static assets and Clerk internal routes
     if (isStaticAsset(path)) {
+      return NextResponse.next();
+    }
+
+    // Always allow public routes
+    if (isPublicRoute(path)) {
       return NextResponse.next();
     }
 
@@ -77,6 +96,11 @@ export default authMiddleware({
 
     // Handle API routes
     if (path.startsWith('/api/')) {
+      // Allow public API routes
+      if (path.startsWith('/api/slots') || path.startsWith('/api/gallery')) {
+        return NextResponse.next();
+      }
+
       // Protect admin API routes
       if (path.startsWith('/api/admin/') && !adminToken?.value) {
         return NextResponse.json(
@@ -102,22 +126,10 @@ export default authMiddleware({
     }
 
     // Handle protected routes
-    if (!auth.userId && !isAdminPath) {
-      const isPublicRoute = [
-        "/",
-        "/gallery",
-        "/contact",
-        "/auth/sign-in",
-        "/auth/sign-up",
-        "/auth/error",
-        "/admin/login",
-      ].includes(path);
-
-      if (!isPublicRoute) {
-        const signInUrl = new URL('/auth/sign-in', req.url);
-        signInUrl.searchParams.set('redirect_url', path);
-        return NextResponse.redirect(signInUrl);
-      }
+    if (!auth.userId && !isAdminPath && !isPublicRoute(path)) {
+      const signInUrl = new URL('/auth/sign-in', req.url);
+      signInUrl.searchParams.set('redirect_url', path);
+      return NextResponse.redirect(signInUrl);
     }
 
     return NextResponse.next();
