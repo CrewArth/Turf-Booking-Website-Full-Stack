@@ -6,37 +6,37 @@ import Image from 'next/image';
 const staticImages = [
   {
     id: 1,
-    url: '/static/1.jpg',
+    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/1.jpg`,
     title: 'Premium Cricket Turf',
     description: 'Experience world-class cricket facilities at our premium turf.'
   },
   {
     id: 2,
-    url: '/static/2.jpg',
+    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/2.jpg`,
     title: 'Professional Pitch',
     description: 'Play on our professionally maintained cricket pitch.'
   },
   {
     id: 3,
-    url: '/static/3.jpg',
+    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/3.jpg`,
     title: 'Modern Facilities',
     description: 'State-of-the-art facilities for the best cricket experience.'
   },
   {
     id: 4,
-    url: '/static/4.jpg',
+    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/4.jpg`,
     title: 'Practice Nets',
     description: 'High-quality practice nets for perfect training sessions.'
   },
   {
     id: 5,
-    url: '/static/5.jpg',
+    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/5.jpg`,
     title: 'Corporate Booking',
     description: "In teamwork, silence isnt golden. It's deadly."
   },
   {
     id: 6,
-    url: '/static/6.jpg',
+    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/6.jpg`,
     title: 'Tournament Ready',
     description: 'Perfect venue for cricket tournaments and matches.'
   }

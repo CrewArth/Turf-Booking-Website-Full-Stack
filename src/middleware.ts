@@ -11,6 +11,11 @@ function isAuthRoute(pathname: string) {
   return pathname.startsWith('/auth/');
 }
 
+// Check if the path is a static asset or image
+function isStaticAsset(pathname: string) {
+  return pathname.includes('.') || pathname.startsWith('/_next/') || pathname === '/favicon.ico';
+}
+
 export default authMiddleware({
   publicRoutes: [
     "/",
@@ -43,6 +48,11 @@ export default authMiddleware({
     // Get admin token from cookies
     const adminToken = req.cookies.get('admin_token');
     const path = req.nextUrl.pathname;
+    
+    // Skip middleware for static assets
+    if (isStaticAsset(path)) {
+      return NextResponse.next();
+    }
     
     // Check if trying to access admin routes
     if (isAdminRoute(path)) {
@@ -93,9 +103,6 @@ export default authMiddleware({
 
 export const config = {
   matcher: [
-    "/((?!.*\\..*|_next).*)",
-    "/",
-    "/(api|trpc)(.*)",
-    "/((?!api|trpc|_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }; 
