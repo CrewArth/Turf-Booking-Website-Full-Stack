@@ -45,7 +45,6 @@ function isPublicApiRoute(pathname: string) {
 }
 
 export default authMiddleware({
-  debug: process.env.NODE_ENV === 'development',
   publicRoutes: [
     "/",
     "/gallery",
@@ -60,8 +59,17 @@ export default authMiddleware({
     "/api/slots",
     "/api/slots/bulk",
     "/api/gallery",
+    "/api/test-db",
+    "/api/test-slots",
   ],
   ignoredRoutes: [
+    "/api/admin/auth",
+    "/api/admin/auth/check",
+    "/api/gallery",
+    "/api/slots",
+    "/api/slots/bulk",
+    "/api/test-db",
+    "/api/test-slots",
     "/_next",
     "/favicon.ico",
     "/api/clerk-webhook",
@@ -88,10 +96,7 @@ export default authMiddleware({
     // Handle admin routes
     if (isAdminPath) {
       if (!adminToken?.value) {
-        // Redirect to admin login with return URL
-        const loginUrl = new URL('/admin/login', req.url);
-        loginUrl.searchParams.set('redirect_url', path);
-        return NextResponse.redirect(loginUrl);
+        return NextResponse.redirect(new URL('/admin/login', req.url));
       }
       return NextResponse.next();
     }
@@ -117,16 +122,14 @@ export default authMiddleware({
       return NextResponse.next();
     }
 
-    // Prevent authenticated users from accessing auth pages
-    if (auth.userId && isAuthRoute(path)) {
-      return NextResponse.redirect(new URL('/', req.url));
-    }
-
-    // Handle protected routes
-    if (!auth.userId && !isAdminPath && !isPublicRoute(path)) {
-      const signInUrl = new URL('/auth/sign-in', req.url);
-      signInUrl.searchParams.set('redirect_url', path);
-      return NextResponse.redirect(signInUrl);
+    // Redirect if not authenticated
+    if (!auth.userId && !isAdminPath && !path.startsWith('/auth/')) {
+      const searchParams = new URLSearchParams({
+        redirect_url: path,
+      });
+      return NextResponse.redirect(
+        new URL(`/auth/sign-in?${searchParams}`, req.url)
+      );
     }
 
     return NextResponse.next();
@@ -135,6 +138,7 @@ export default authMiddleware({
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!.*\\..*|_next).*)",
+    "/(api|trpc)(.*)",
   ],
 }; 
