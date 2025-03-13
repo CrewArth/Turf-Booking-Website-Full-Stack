@@ -11,6 +11,17 @@ function isAuthRoute(pathname: string) {
   return pathname.startsWith('/auth/');
 }
 
+// Check if the path is a static asset
+function isStaticAsset(pathname: string) {
+  return (
+    pathname.includes('.') || // Has file extension
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/static/') ||
+    pathname.startsWith('/hero-bg') ||
+    pathname === '/favicon.ico'
+  );
+}
+
 export default authMiddleware({
   publicRoutes: [
     "/",
@@ -27,6 +38,10 @@ export default authMiddleware({
     "/api/gallery",
     "/api/test-db",
     "/api/test-slots",
+    "/hero-bg.jpg",
+    "/static/(.*)",
+    "/_next/(.*)",
+    "/favicon.ico",
   ],
   ignoredRoutes: [
     "/api/admin/auth",
@@ -35,7 +50,9 @@ export default authMiddleware({
     "/api/slots/bulk",
     "/api/test-db",
     "/api/test-slots",
-    "/_next",
+    "/_next/(.*)",
+    "/static/(.*)",
+    "/hero-bg.jpg",
     "/favicon.ico",
     "/api/clerk-webhook",
   ],
@@ -43,6 +60,11 @@ export default authMiddleware({
     // Get admin token from cookies
     const adminToken = req.cookies.get('admin_token');
     const path = req.nextUrl.pathname;
+    
+    // Skip middleware for static assets
+    if (isStaticAsset(path)) {
+      return NextResponse.next();
+    }
     
     // Check if trying to access admin routes
     if (isAdminRoute(path)) {
@@ -78,8 +100,6 @@ export default authMiddleware({
         "/auth/sign-up",
         "/auth/error",
         "/admin/login",
-        "/_next",
-        "/favicon.ico",
       ].includes(path);
       
       if (!isPublicRoute) {
@@ -93,9 +113,6 @@ export default authMiddleware({
 
 export const config = {
   matcher: [
-    "/((?!.*\\..*|_next).*)",
-    "/",
-    "/(api|trpc)(.*)",
-    "/((?!api|trpc|_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico|hero-bg.jpg|static/).*)",
   ],
 }; 
