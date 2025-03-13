@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['res.cloudinary.com', 'img.clerk.com'],
+    domains: ['res.cloudinary.com', 'img.clerk.com', 'images.clerk.dev'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -12,6 +12,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'img.clerk.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.clerk.dev',
         pathname: '/**',
       }
     ],
@@ -50,7 +55,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: `
               default-src 'self';
-              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.vercel.app;
+              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.clerk.accounts.dev https://*.razorpay.com https://checkout.razorpay.com https://*.vercel.app;
               worker-src 'self' blob: https://*.clerk.accounts.dev https://*.clerk.dev;
               style-src 'self' 'unsafe-inline' https://*.clerk.dev;
               img-src 'self' blob: data: https://*.clerk.accounts.dev https://img.clerk.com https://images.clerk.dev https://*.clerk.dev https://res.cloudinary.com;

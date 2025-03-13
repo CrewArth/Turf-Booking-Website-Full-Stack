@@ -13,10 +13,14 @@ function isAuthRoute(pathname: string) {
 
 // Check if the path is a static asset or image
 function isStaticAsset(pathname: string) {
-  return pathname.includes('.') || pathname.startsWith('/_next/') || pathname === '/favicon.ico';
+  return pathname.includes('.') || 
+         pathname.startsWith('/_next/') || 
+         pathname === '/favicon.ico' ||
+         pathname.startsWith('/__clerk');
 }
 
 export default authMiddleware({
+  debug: process.env.NODE_ENV === 'development',
   publicRoutes: [
     "/",
     "/gallery",
@@ -45,11 +49,13 @@ export default authMiddleware({
     "/_next",
     "/favicon.ico",
     "/api/clerk-webhook",
+    "/__clerk",
   ],
   afterAuth(auth, req) {
-    const path = req.nextUrl.pathname;
+    const url = new URL(req.url);
+    const path = url.pathname;
     
-    // Skip middleware for static assets
+    // Skip middleware for static assets and Clerk internal routes
     if (isStaticAsset(path)) {
       return NextResponse.next();
     }
@@ -66,6 +72,7 @@ export default authMiddleware({
         loginUrl.searchParams.set('redirect_url', path);
         return NextResponse.redirect(loginUrl);
       }
+      return NextResponse.next();
     }
 
     // Handle API routes
@@ -119,6 +126,7 @@ export default authMiddleware({
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    "/((?!.*\\..*|_next).*)",
+    "/(api|trpc)(.*)",
   ],
 }; 
