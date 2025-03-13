@@ -5,6 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { format, addDays } from 'date-fns';
 import { loadRazorpayScript, createPaymentOrder } from '@/lib/razorpay';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 interface Slot {
   _id: string;
@@ -32,15 +33,16 @@ function formatTime(time: string): string {
 
 export default function BookingPage() {
   const { user, isLoaded: isUserLoaded } = useUser();
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const router = useRouter();
 
   const nextDays = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
 
@@ -296,183 +298,119 @@ export default function BookingPage() {
   };
 
   const getAvailableSlots = (slotId: string) => {
-    if (!Array.isArray(bookings)) return 0;
+    if (!bookings || !slots) return 0;
+
+    // Filter out bookings with null slotId
+    const validBookings = bookings.filter(booking => booking.slotId && booking.slotId._id);
     
-    const bookedCount = bookings.filter(
+    const bookedCount = validBookings.filter(
       (booking) =>
         booking.slotId._id === slotId &&
         booking.status === 'confirmed'
     ).length;
+
     const slot = slots.find((s) => s._id === slotId);
-    return slot ? slot.totalCapacity - bookedCount : 0;
+    if (!slot) return 0;
+
+    return slot.totalCapacity - bookedCount;
   };
 
   const handleBooking = async () => {
-    if (!selectedSlot || !user || isProcessing) return;
+    if (!selectedSlot) {
+      toast.error('Please select a slot');
+      return;
+    }
 
     try {
-      setIsProcessing(true);
-      setPaymentError(null);
+      setLoading(true);
 
-      // Load Razorpay script with retry
-      let isScriptLoaded = false;
-      for (let i = 0; i < 3; i++) {
-        isScriptLoaded = await loadRazorpayScript();
-        if (isScriptLoaded) break;
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+      // Check if slot exists and has capacity
+      const availableSlots = getAvailableSlots(selectedSlot._id);
+      if (availableSlots <= 0) {
+        toast.error('This slot is fully booked');
+        return;
       }
 
-      if (!isScriptLoaded) {
-        throw new Error('Failed to load payment gateway. Please check your internet connection and try again.');
+      // Create payment order
+      const orderData = await createPaymentOrder({
+        amount: selectedSlot.price * 100, // Convert to paise
+        currency: 'INR',
+        notes: {
+          slotId: selectedSlot._id,
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          time: selectedSlot.time,
+        },
+      });
+
+      if (!orderData?.key || !orderData?.orderId) {
+        throw new Error('Failed to create payment order');
       }
 
-      // Create payment order with timeout
-      const orderResponse = await Promise.race([
-        createPaymentOrder({
-          amount: selectedSlot.price,
-          notes: {
-            slotId: selectedSlot._id,
-            date: format(selectedDate, 'yyyy-MM-dd'),
-            time: selectedSlot.time,
-          },
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Payment request timed out. Please try again.')), 30000)
-        )
-      ]);
+      // Load Razorpay script
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        throw new Error('Failed to load Razorpay script');
+      }
 
-      // Initialize Razorpay payment
+      // Initialize payment
       const options = {
-        key: orderResponse.key,
-        amount: orderResponse.amount,
-        currency: orderResponse.currency,
+        key: orderData.key,
+        amount: orderData.amount,
+        currency: 'INR',
         name: 'Turf 106',
         description: `Booking for ${format(selectedDate, 'dd MMM yyyy')} at ${formatTime(selectedSlot.time)}`,
-        order_id: orderResponse.orderId,
-        prefill: {
-          name: user.fullName,
-          email: user.primaryEmailAddress?.emailAddress,
-        },
-        handler: async function (response: any) {
+        order_id: orderData.orderId,
+        handler: async (response: any) => {
           try {
-            console.log('Payment successful, creating booking...');
-            
-            // Create booking with timeout
-            const bookingResponse = (await Promise.race([
-              fetch('/api/bookings', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  slotId: selectedSlot._id,
-                  date: format(selectedDate, 'yyyy-MM-dd'),
-                  paymentId: response.razorpay_payment_id,
-                  orderId: response.razorpay_order_id,
-                  signature: response.razorpay_signature,
-                  amount: selectedSlot.price,
-                }),
+            // Create booking
+            const bookingResponse = await fetch('/api/bookings', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                slotId: selectedSlot._id,
+                date: format(selectedDate, 'yyyy-MM-dd'),
+                paymentId: response.razorpay_payment_id,
+                orderId: response.razorpay_order_id,
+                signature: response.razorpay_signature,
+                amount: selectedSlot.price,
               }),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Booking request timed out. Please check your bookings page.')), 30000)
-              )
-            ])) as Response;
-
-            if (!bookingResponse.ok) {
-              const errorData = await bookingResponse.json();
-              console.error('Booking failed:', errorData);
-              throw new Error(errorData.error || errorData.details || 'Failed to complete booking');
-            }
+            });
 
             const bookingData = await bookingResponse.json();
-            console.log('Booking created:', bookingData);
 
-            // Generate ticket with timeout
-            try {
-              const ticketResponse = (await Promise.race([
-                fetch('/api/tickets', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    bookingId: bookingData.booking._id,
-                  }),
-                }),
-                new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Ticket generation timed out')), 30000)
-                )
-              ])) as Response;
-
-              if (!ticketResponse.ok) {
-                console.error('Failed to generate ticket:', await ticketResponse.text());
-                // Don't throw error here, just log it
-              }
-            } catch (ticketError) {
-              console.error('Ticket generation error:', ticketError);
-              // Don't throw error here, just log it
+            if (!bookingResponse.ok) {
+              throw new Error(bookingData.message || 'Failed to create booking');
             }
 
-            // Show success message and redirect
-            toast.success('Booking confirmed successfully!');
-            window.location.href = '/bookings';
+            toast.success('Booking confirmed!');
+            router.push('/bookings');
           } catch (error) {
-            console.error('Booking error:', error);
-            toast.error(error instanceof Error ? error.message : 'Failed to complete booking. Please check your bookings page.');
-            // Refresh slots to show updated availability
-            await Promise.all([
-              fetchSlots(format(selectedDate, 'yyyy-MM-dd')),
-              fetchBookings(format(selectedDate, 'yyyy-MM-dd'))
-            ]);
-          } finally {
-            setIsProcessing(false);
+            console.error('Booking creation error:', error);
+            toast.error('Failed to confirm booking. Please contact support.');
           }
         },
-        modal: {
-          ondismiss: function() {
-            setIsProcessing(false);
-            setPaymentError(null);
-            // Refresh slots to show updated availability
-            Promise.all([
-              fetchSlots(format(selectedDate, 'yyyy-MM-dd')),
-              fetchBookings(format(selectedDate, 'yyyy-MM-dd'))
-            ]);
-          },
-          escape: true,
-          handleback: function() {
-            // Handle back button press on mobile
-            setIsProcessing(false);
-            setPaymentError(null);
-          },
+        prefill: {
+          email: user?.emailAddresses?.[0]?.emailAddress || '',
+          contact: '',
         },
         theme: {
           color: '#16a34a',
         },
-        retry: {
-          enabled: true,
-          max_count: 3,
-        },
       };
 
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', function(response: any) {
-        console.error('Payment failed:', response.error);
-        toast.error(response.error.description || 'Payment failed. Please try again.');
-        setPaymentError(response.error.description || 'Payment failed. Please try again.');
-        setIsProcessing(false);
-      });
-      
-      rzp.open();
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.open();
     } catch (error) {
       console.error('Payment initialization error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to initialize payment');
-      setPaymentError(error instanceof Error ? error.message : 'Failed to initialize payment');
-      setIsProcessing(false);
-      // Refresh slots to show updated availability
-      await Promise.all([
-        fetchSlots(format(selectedDate, 'yyyy-MM-dd')),
-        fetchBookings(format(selectedDate, 'yyyy-MM-dd'))
-      ]);
+      toast.error(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to initialize payment'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
