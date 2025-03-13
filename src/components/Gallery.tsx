@@ -6,38 +6,38 @@ import Image from 'next/image';
 const staticImages = [
   {
     id: 1,
-    title: "Cricket Ground",
-    description: "Professional cricket ground with top-notch facilities",
+    title: "Premium Cricket Turf",
+    description: "Experience world-class cricket facilities at our premium turf.",
     url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852231/1.jpg"
   },
   {
     id: 2,
-    title: "Football Field",
-    description: "FIFA standard football field with artificial turf",
+    title: "Professional Pitch",
+    description: "Play on our professionally maintained cricket pitch.",
     url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852233/2.jpg"
   },
   {
     id: 3,
-    title: "Basketball Court",
-    description: "Indoor basketball court with professional flooring",
+    title: "Modern Facilities",
+    description: "State-of-the-art facilities for the best cricket experience.",
     url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852232/3.jpg"
   },
   {
     id: 4,
-    title: "Tennis Court",
-    description: "Well-maintained tennis court with night lighting",
+    title: "Practice Nets",
+    description: "High-quality practice nets for perfect training sessions.",
     url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852233/4.jpg"
   },
   {
     id: 5,
-    title: "Volleyball Court",
-    description: "Beach volleyball court with premium sand",
+    title: "Corporate Booking",
+    description: "In teamwork, silence isnt golden. It's deadly.",
     url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852233/5.jpg"
   },
   {
     id: 6,
-    title: "Badminton Court",
-    description: "Indoor badminton court with proper lighting",
+    title: "Tournament Ready",
+    description: "Perfect venue for cricket tournaments and matches.",
     url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852234/6.jpg",
   }
 ];
