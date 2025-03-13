@@ -14,11 +14,12 @@ export default function Hero() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/hero-bg.jpg`}
-          alt="Cricket ground"
+          src="https://res.cloudinary.com/duafanigh/image/upload/v1741852221/hero-bg_uhbocr.jpg"
+          alt="Hero Background"
           fill
-          className="object-cover opacity-30"
           priority
+          unoptimized={true}
+          className="object-cover object-center"
         />
       </div>
 

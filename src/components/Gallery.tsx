@@ -6,39 +6,39 @@ import Image from 'next/image';
 const staticImages = [
   {
     id: 1,
-    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/1.jpg`,
-    title: 'Premium Cricket Turf',
-    description: 'Experience world-class cricket facilities at our premium turf.'
+    title: "Cricket Ground",
+    description: "Professional cricket ground with top-notch facilities",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/1_aqxvxr.jpg"
   },
   {
     id: 2,
-    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/2.jpg`,
-    title: 'Professional Pitch',
-    description: 'Play on our professionally maintained cricket pitch.'
+    title: "Football Field",
+    description: "FIFA standard football field with artificial turf",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/2_aqxvxr.jpg"
   },
   {
     id: 3,
-    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/3.jpg`,
-    title: 'Modern Facilities',
-    description: 'State-of-the-art facilities for the best cricket experience.'
+    title: "Basketball Court",
+    description: "Indoor basketball court with professional flooring",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/3_aqxvxr.jpg"
   },
   {
     id: 4,
-    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/4.jpg`,
-    title: 'Practice Nets',
-    description: 'High-quality practice nets for perfect training sessions.'
+    title: "Tennis Court",
+    description: "Well-maintained tennis court with night lighting",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/4_aqxvxr.jpg"
   },
   {
     id: 5,
-    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/5.jpg`,
-    title: 'Corporate Booking',
-    description: "In teamwork, silence isnt golden. It's deadly."
+    title: "Volleyball Court",
+    description: "Beach volleyball court with premium sand",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/5_aqxvxr.jpg"
   },
   {
     id: 6,
-    url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1/6.jpg`,
-    title: 'Tournament Ready',
-    description: 'Perfect venue for cricket tournaments and matches.'
+    title: "Badminton Court",
+    description: "Indoor badminton court with proper lighting",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/6_aqxvxr.jpg",
   }
 ];
 
@@ -97,8 +97,9 @@ export default function Gallery() {
                   src={image.url}
                   alt={image.title}
                   fill
+                  priority
+                  unoptimized={true}
                   className="object-cover"
-                  priority={index === 0}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
                   <div className="absolute bottom-0 left-0 right-0 p-8 transform transition-all duration-700 delay-300">

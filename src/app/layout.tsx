@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     ],
   },
   other: {
-    'Content-Security-Policy': `
+    "Content-Security-Policy": `
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com https://*.google.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
