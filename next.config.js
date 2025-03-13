@@ -14,7 +14,7 @@ const nextConfig = {
         hostname: '**',
       },
     ],
-    unoptimized: false,
+    unoptimized: true,
   },
   swcMinify: true,
   compiler: {
@@ -49,13 +49,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: `
               default-src 'self';
-              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.vercel.app;
-              worker-src 'self' blob: https://*.clerk.accounts.dev https://*.clerk.dev;
-              style-src 'self' 'unsafe-inline' https://*.clerk.dev;
-              img-src 'self' blob: data: https://*.clerk.accounts.dev https://img.clerk.com https://images.clerk.dev https://*.clerk.dev;
-              connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.dev https://*.clerk.dev https://*.razorpay.com https://api.razorpay.com;
-              frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev;
-              font-src 'self' data: https://*.clerk.dev;
+              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com;
+              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+              img-src 'self' data: blob: https://* http://* *;
+              font-src 'self' https://fonts.gstatic.com;
+              frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.dev https://*.razorpay.com;
+              connect-src 'self' https://*.clerk.dev https://*.razorpay.com *;
               manifest-src 'self';
             `.replace(/\s+/g, ' ').trim()
           }

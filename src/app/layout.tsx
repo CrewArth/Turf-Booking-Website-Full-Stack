@@ -33,12 +33,13 @@ export const metadata: Metadata = {
   other: {
     'Content-Security-Policy': `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com https://*.google.com;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      img-src 'self' data: blob: https: http:;
+      img-src 'self' data: blob: https://* http://* *;
       font-src 'self' https://fonts.gstatic.com;
-      frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.google.com https://www.google.com;
-      connect-src 'self' https://*.clerk.dev https://api.razorpay.com https://*.razorpay.com https://res.cloudinary.com https://* http://*;
+      frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.dev https://*.razorpay.com;
+      connect-src 'self' https://*.clerk.dev https://*.razorpay.com *;
+      manifest-src 'self';
     `.replace(/\s+/g, ' ').trim()
   }
 };
