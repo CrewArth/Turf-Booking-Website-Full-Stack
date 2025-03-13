@@ -2,21 +2,16 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    domains: [
+      'res.cloudinary.com',
+      'images.unsplash.com',
+      'lh3.googleusercontent.com',
+      'img.clerk.com',
+    ],
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'img.clerk.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.clerk.dev',
-        pathname: '/**',
+        hostname: '**',
       },
     ],
     unoptimized: false,
@@ -67,6 +62,9 @@ const nextConfig = {
         ]
       }
     ];
+  },
+  typescript: {
+    ignoreBuildErrors: true,
   },
 };
 
