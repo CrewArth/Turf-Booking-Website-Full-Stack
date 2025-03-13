@@ -21,7 +21,7 @@ function isStaticAsset(pathname: string) {
 
 // Check if the path is a public route
 function isPublicRoute(pathname: string) {
-  return [
+  const publicPaths = [
     "/",
     "/gallery",
     "/contact",
@@ -29,7 +29,19 @@ function isPublicRoute(pathname: string) {
     "/auth/sign-up",
     "/auth/error",
     "/admin/login",
-  ].includes(pathname);
+  ];
+  return publicPaths.some(path => pathname === path);
+}
+
+// Check if the path is a public API route
+function isPublicApiRoute(pathname: string) {
+  const publicApiPaths = [
+    "/api/slots",
+    "/api/gallery",
+    "/api/admin/auth",
+    "/api/admin/auth/check",
+  ];
+  return publicApiPaths.some(path => pathname.startsWith(path));
 }
 
 export default authMiddleware({
@@ -48,24 +60,14 @@ export default authMiddleware({
     "/api/slots",
     "/api/slots/bulk",
     "/api/gallery",
-    "/api/test-db",
-    "/api/test-slots",
   ],
   ignoredRoutes: [
-    "/api/admin/auth",
-    "/api/admin/auth/check",
-    "/api/gallery",
-    "/api/slots",
-    "/api/slots/bulk",
-    "/api/test-db",
-    "/api/test-slots",
     "/_next",
     "/favicon.ico",
     "/api/clerk-webhook",
     "/__clerk",
   ],
   afterAuth(auth, req) {
-    // Get the pathname from the URL
     const url = new URL(req.url);
     const path = url.pathname;
     
@@ -75,7 +77,7 @@ export default authMiddleware({
     }
 
     // Always allow public routes
-    if (isPublicRoute(path)) {
+    if (isPublicRoute(path) || isPublicApiRoute(path)) {
       return NextResponse.next();
     }
 
@@ -96,11 +98,6 @@ export default authMiddleware({
 
     // Handle API routes
     if (path.startsWith('/api/')) {
-      // Allow public API routes
-      if (path.startsWith('/api/slots') || path.startsWith('/api/gallery')) {
-        return NextResponse.next();
-      }
-
       // Protect admin API routes
       if (path.startsWith('/api/admin/') && !adminToken?.value) {
         return NextResponse.json(
@@ -138,7 +135,6 @@ export default authMiddleware({
 
 export const config = {
   matcher: [
-    "/((?!.*\\..*|_next).*)",
-    "/(api|trpc)(.*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }; 
