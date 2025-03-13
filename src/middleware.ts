@@ -91,12 +91,17 @@ export default authMiddleware({
 
     // Get admin token from cookies
     const adminToken = req.cookies.get('admin_token');
+    const adminEmail = req.cookies.get('admin_email');
     const isAdminPath = isAdminRoute(path);
     
     // Handle admin routes
     if (isAdminPath) {
-      if (!adminToken?.value) {
-        return NextResponse.redirect(new URL('/admin/login', req.url));
+      if (!adminToken?.value || !adminEmail?.value || adminEmail.value !== process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+        // Clear invalid admin cookies
+        const response = NextResponse.redirect(new URL('/admin/login', req.url));
+        response.cookies.delete('admin_token');
+        response.cookies.delete('admin_email');
+        return response;
       }
       return NextResponse.next();
     }
@@ -104,7 +109,7 @@ export default authMiddleware({
     // Handle API routes
     if (path.startsWith('/api/')) {
       // Protect admin API routes
-      if (path.startsWith('/api/admin/') && !adminToken?.value) {
+      if (path.startsWith('/api/admin/') && (!adminToken?.value || !adminEmail?.value || adminEmail.value !== process.env.NEXT_PUBLIC_ADMIN_EMAIL)) {
         return NextResponse.json(
           { error: 'Admin authentication required' },
           { status: 401 }

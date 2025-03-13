@@ -16,12 +16,13 @@ export default function AdminLogin() {
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
+        setIsChecking(true);
         const response = await fetch('/api/admin/auth/check', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
-          credentials: 'include', // Important for cookies
+          credentials: 'include',
         });
 
         const data = await response.json();
@@ -29,23 +30,26 @@ export default function AdminLogin() {
         if (response.ok && data.isAdmin) {
           const redirectUrl = searchParams?.get('redirect_url') || '/admin/slots';
           router.push(redirectUrl);
+        } else {
+          // Clear any existing admin cookies if not authenticated
+          await fetch('/api/admin/auth', {
+            method: 'DELETE',
+            credentials: 'include',
+          });
         }
       } catch (error) {
         console.error('Error checking admin status:', error);
+        // Clear any existing admin cookies on error
+        await fetch('/api/admin/auth', {
+          method: 'DELETE',
+          credentials: 'include',
+        });
       } finally {
         setIsChecking(false);
       }
     };
 
-    // Only check status if we're mounted
-    let mounted = true;
-    if (mounted) {
-      checkAdminStatus();
-    }
-
-    return () => {
-      mounted = false;
-    };
+    checkAdminStatus();
   }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {

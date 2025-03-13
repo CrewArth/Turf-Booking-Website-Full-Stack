@@ -9,7 +9,8 @@ export async function GET() {
 
     // Check both token and email
     if (!adminToken?.value || !adminEmail?.value) {
-      return new NextResponse(
+      // Clear invalid cookies in the response
+      const response = new NextResponse(
         JSON.stringify({
           isAdmin: false,
           message: 'Admin authentication required'
@@ -21,12 +22,17 @@ export async function GET() {
           }
         }
       );
+      
+      response.cookies.delete('admin_token');
+      response.cookies.delete('admin_email');
+      return response;
     }
 
     // Verify against environment variable
     const validAdminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
     if (!validAdminEmail || adminEmail.value !== validAdminEmail) {
-      return new NextResponse(
+      // Clear invalid cookies in the response
+      const response = new NextResponse(
         JSON.stringify({
           isAdmin: false,
           message: 'Invalid admin credentials'
@@ -38,6 +44,10 @@ export async function GET() {
           }
         }
       );
+      
+      response.cookies.delete('admin_token');
+      response.cookies.delete('admin_email');
+      return response;
     }
 
     return new NextResponse(
@@ -54,7 +64,8 @@ export async function GET() {
     );
   } catch (error) {
     console.error('Error checking admin status:', error);
-    return new NextResponse(
+    // Clear cookies on error
+    const response = new NextResponse(
       JSON.stringify({
         isAdmin: false,
         message: 'Error checking admin status'
@@ -66,5 +77,9 @@ export async function GET() {
         }
       }
     );
+    
+    response.cookies.delete('admin_token');
+    response.cookies.delete('admin_email');
+    return response;
   }
 } 
