@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 // Handle admin routes separately
 function isAdminRoute(pathname: string) {
-  return pathname.startsWith('/admin') && !pathname.startsWith('/admin/login');
+  return pathname.startsWith('/admin') && pathname !== '/admin/login';
 }
 
 // Check if the path is an auth route
@@ -47,28 +47,30 @@ export default authMiddleware({
     "/api/clerk-webhook",
   ],
   afterAuth(auth, req) {
-    // Get admin token from cookies
-    const adminToken = req.cookies.get('admin_token');
     const path = req.nextUrl.pathname;
     
     // Skip middleware for static assets
     if (isStaticAsset(path)) {
       return NextResponse.next();
     }
+
+    // Get admin token from cookies
+    const adminToken = req.cookies.get('admin_token');
+    const isAdminPath = isAdminRoute(path);
     
-    // Check if trying to access admin routes
-    if (isAdminRoute(path)) {
+    // Handle admin routes
+    if (isAdminPath) {
       if (!adminToken?.value) {
+        // Redirect to admin login with return URL
         const loginUrl = new URL('/admin/login', req.url);
         loginUrl.searchParams.set('redirect_url', path);
         return NextResponse.redirect(loginUrl);
       }
-      return NextResponse.next();
     }
 
-    // Handle protected API routes
+    // Handle API routes
     if (path.startsWith('/api/')) {
-      // Allow admin API routes only with admin token
+      // Protect admin API routes
       if (path.startsWith('/api/admin/') && !adminToken?.value) {
         return NextResponse.json(
           { error: 'Admin authentication required' },
@@ -76,13 +78,14 @@ export default authMiddleware({
         );
       }
 
-      // Allow payment and booking routes only for authenticated users
+      // Protect user-specific API routes
       if ((path.startsWith('/api/payments/') || path.startsWith('/api/bookings/')) && !auth.userId) {
         return NextResponse.json(
           { error: 'Authentication required' },
           { status: 401 }
         );
       }
+
       return NextResponse.next();
     }
 
@@ -91,8 +94,8 @@ export default authMiddleware({
       return NextResponse.redirect(new URL('/', req.url));
     }
 
-    // Check if trying to access protected routes without authentication
-    if (!auth.userId) {
+    // Handle protected routes
+    if (!auth.userId && !isAdminPath) {
       const isPublicRoute = [
         "/",
         "/gallery",
@@ -101,10 +104,8 @@ export default authMiddleware({
         "/auth/sign-up",
         "/auth/error",
         "/admin/login",
-        "/_next",
-        "/favicon.ico",
       ].includes(path);
-      
+
       if (!isPublicRoute) {
         const signInUrl = new URL('/auth/sign-in', req.url);
         signInUrl.searchParams.set('redirect_url', path);

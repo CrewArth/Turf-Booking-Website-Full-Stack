@@ -146,8 +146,9 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function PUT(req: Request) {
   try {
+    // Check admin authentication
     const cookies = req.headers.get('cookie');
     if (!cookies?.includes('admin_token=true')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -161,7 +162,82 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Slot ID is required' }, { status: 400 });
     }
 
-    const result = await Slot.findByIdAndDelete(slotId) as SlotDocument | null;
+    const data = await req.json();
+
+    // Validate required fields
+    if (!data.time || !data.date || typeof data.price !== 'number' || data.price < 0) {
+      return NextResponse.json({ 
+        error: 'Invalid slot data',
+        details: 'Required fields: time, date, price (>= 0)'
+      }, { status: 400 });
+    }
+
+    // Format date
+    const formattedDate = new Date(data.date).toISOString().split('T')[0];
+
+    // Update slot
+    const updatedSlot = await Slot.findByIdAndUpdate(
+      slotId,
+      { 
+        ...data,
+        date: formattedDate,
+        isEnabled: data.isEnabled ?? true,
+        totalCapacity: data.totalCapacity || 1
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedSlot) {
+      return NextResponse.json({ error: 'Slot not found' }, { status: 404 });
+    }
+
+    console.log('Slot updated:', {
+      id: updatedSlot._id,
+      date: updatedSlot.date,
+      time: updatedSlot.time,
+      capacity: updatedSlot.totalCapacity,
+      enabled: updatedSlot.isEnabled
+    });
+
+    return NextResponse.json({ success: true, slot: updatedSlot });
+  } catch (error) {
+    console.error('Error updating slot:', error);
+    return NextResponse.json({ 
+      success: false,
+      error: 'Failed to update slot',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const cookies = req.headers.get('cookie');
+    if (!cookies?.includes('admin_token=true')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await dbConnect();
+    const { searchParams } = new URL(req.url);
+    const slotId = searchParams.get('slotId');
+    const deleteAll = searchParams.get('deleteAll');
+
+    if (deleteAll === 'true') {
+      // Delete all slots
+      const result = await Slot.deleteMany({});
+      console.log('All slots deleted:', result);
+      return NextResponse.json({ 
+        success: true,
+        message: 'All slots deleted successfully',
+        count: result.deletedCount
+      });
+    }
+
+    if (!slotId) {
+      return NextResponse.json({ error: 'Slot ID is required' }, { status: 400 });
+    }
+
+    const result = await Slot.findByIdAndDelete(slotId);
     if (!result) {
       return NextResponse.json({ error: 'Slot not found' }, { status: 404 });
     }

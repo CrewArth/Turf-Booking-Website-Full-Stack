@@ -1,0 +1,10 @@
+1. Failed to Update Slots[
+    page-f4a7aba076c7986c.js:1 
+ PUT https://turf106.vercel.app/api/slots/67d298f… 400 (Bad Request)
+]
+2. I am able to access admin page without login.
+3. Failed to delete all slots [
+    page-f4a7aba076c7986c.js:1 
+ DELETE https://turf106.vercel.app/api/slots?deleteAll=true 400 (Bad Request)
+]
+4. The Capacity of the slots is not updating in Admin's Available Slots Section.

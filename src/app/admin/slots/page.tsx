@@ -186,24 +186,29 @@ export default function AdminSlotsPage() {
   };
 
   const handleDeleteAllSlots = async () => {
-    if (!confirm('Are you sure you want to delete ALL slots? This action cannot be undone!')) {
+    if (!confirm('Are you sure you want to delete all slots? This action cannot be undone.')) {
       return;
     }
 
     try {
       const response = await fetch('/api/slots?deleteAll=true', {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to delete all slots');
+        throw new Error(data.message || data.error || 'Failed to delete all slots');
       }
 
-      alert('All slots deleted successfully');
-      fetchSlots();
+      setSlots([]);
+      toast.success(`Successfully deleted ${data.count} slots`);
     } catch (error) {
-      console.error('Failed to delete all slots:', error);
-      alert('Failed to delete all slots. Please try again.');
+      console.error('Error deleting all slots:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete all slots');
     }
   };
 
@@ -212,28 +217,35 @@ export default function AdminSlotsPage() {
     if (!selectedSlot) return;
 
     try {
-      const response = await fetch(`/api/slots/${selectedSlot._id}`, {
+      const response = await fetch(`/api/slots?slotId=${selectedSlot._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updateForm),
+        body: JSON.stringify({
+          time: selectedSlot.time,
+          date: selectedSlot.date,
+          price: Number(selectedSlot.price),
+          totalCapacity: Number(selectedSlot.totalCapacity),
+          isNight: selectedSlot.isNight,
+          isEnabled: selectedSlot.isEnabled
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update slot');
+        throw new Error(data.message || data.error || 'Failed to update slot');
       }
 
       setSlots(slots.map(slot => 
-        slot._id === selectedSlot._id ? { ...slot, ...updateForm } : slot
+        slot._id === selectedSlot._id ? data.slot : slot
       ));
       setShowUpdateModal(false);
       toast.success('Slot updated successfully');
     } catch (error) {
       console.error('Error updating slot:', error);
-      toast.error('Failed to update slot');
+      toast.error(error instanceof Error ? error.message : 'Failed to update slot');
     }
   };
 
