@@ -8,37 +8,37 @@ const staticImages = [
     id: 1,
     title: "Cricket Ground",
     description: "Professional cricket ground with top-notch facilities",
-    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/1_aqxvxr.jpg"
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852231/1.jpg"
   },
   {
     id: 2,
     title: "Football Field",
     description: "FIFA standard football field with artificial turf",
-    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/2_aqxvxr.jpg"
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852233/2.jpg"
   },
   {
     id: 3,
     title: "Basketball Court",
     description: "Indoor basketball court with professional flooring",
-    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/3_aqxvxr.jpg"
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852232/3.jpg"
   },
   {
     id: 4,
     title: "Tennis Court",
     description: "Well-maintained tennis court with night lighting",
-    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/4_aqxvxr.jpg"
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852233/4.jpg"
   },
   {
     id: 5,
     title: "Volleyball Court",
     description: "Beach volleyball court with premium sand",
-    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/5_aqxvxr.jpg"
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852233/5.jpg"
   },
   {
     id: 6,
     title: "Badminton Court",
     description: "Indoor badminton court with proper lighting",
-    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852221/6_aqxvxr.jpg",
+    url: "https://res.cloudinary.com/duafanigh/image/upload/v1741852234/6.jpg",
   }
 ];
 
