@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Turf 106 - Online Turf Booking",
+  title: "TurfBook - Cricket Turf Booking",
   description: "Book your cricket turf online with ease. Choose from multiple locations and time slots.",
   metadataBase: new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`),
   icons: {
@@ -33,13 +33,12 @@ export const metadata: Metadata = {
   other: {
     'Content-Security-Policy': `
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.clerk.com https://*.razorpay.com https://checkout.razorpay.com https://*.vercel.app;
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.dev https://*.clerk.com;
-      img-src 'self' data: blob: https://* http://* *;
-      font-src 'self' https://fonts.gstatic.com data:;
-      frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.dev https://*.clerk.com https://*.razorpay.com;
-      connect-src 'self' https://*.clerk.dev https://*.clerk.com https://*.razorpay.com https://api.clerk.dev https://api.clerk.com https://* http://*;
-      manifest-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com https://*.google.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: https://*.clerk.dev https://* blob:;
+      font-src 'self' https://fonts.gstatic.com;
+      frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.google.com https://www.google.com;
+      connect-src 'self' https://*.clerk.dev https://api.razorpay.com https://*.razorpay.com;
     `.replace(/\s+/g, ' ').trim()
   }
 };
@@ -51,7 +50,6 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       appearance={{
         elements: {
           formButtonPrimary: "bg-green-600 hover:bg-green-700 text-sm normal-case",
