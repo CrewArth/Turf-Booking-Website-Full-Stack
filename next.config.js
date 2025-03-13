@@ -7,6 +7,9 @@ const nextConfig = {
       'images.unsplash.com',
       'lh3.googleusercontent.com',
       'img.clerk.com',
+      'img.clerk.dev',
+      'images.clerk.dev',
+      'vercel.app',
     ],
     remotePatterns: [
       {
@@ -18,7 +21,7 @@ const nextConfig = {
   },
   swcMinify: true,
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: false,
   },
   async headers() {
     return [
@@ -49,12 +52,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: `
               default-src 'self';
-              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com;
-              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.clerk.com https://*.razorpay.com https://checkout.razorpay.com https://*.vercel.app;
+              style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.dev https://*.clerk.com;
               img-src 'self' data: blob: https://* http://* *;
-              font-src 'self' https://fonts.gstatic.com;
-              frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.dev https://*.razorpay.com;
-              connect-src 'self' https://*.clerk.dev https://*.razorpay.com *;
+              font-src 'self' https://fonts.gstatic.com data:;
+              frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.dev https://*.clerk.com https://*.razorpay.com;
+              connect-src 'self' https://*.clerk.dev https://*.clerk.com https://*.razorpay.com https://api.clerk.dev https://api.clerk.com https://* http://*;
               manifest-src 'self';
             `.replace(/\s+/g, ' ').trim()
           }
@@ -65,6 +68,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  output: 'standalone',
 };
 
 module.exports = nextConfig; 
