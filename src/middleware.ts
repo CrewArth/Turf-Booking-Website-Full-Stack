@@ -27,6 +27,7 @@ export default authMiddleware({
     "/api/webhook",
     "/admin/login",
     "/api/admin/auth",
+    "/api/admin/auth/check",
     "/api/slots",
     "/api/slots/bulk",
     "/api/gallery",
@@ -35,6 +36,7 @@ export default authMiddleware({
   ],
   ignoredRoutes: [
     "/api/admin/auth",
+    "/api/admin/auth/check",
     "/api/gallery",
     "/api/slots",
     "/api/slots/bulk",
@@ -57,12 +59,23 @@ export default authMiddleware({
     // Check if trying to access admin routes
     if (isAdminRoute(path)) {
       if (!adminToken?.value) {
-        return NextResponse.redirect(new URL('/admin/login', req.url));
+        const loginUrl = new URL('/admin/login', req.url);
+        loginUrl.searchParams.set('redirect_url', path);
+        return NextResponse.redirect(loginUrl);
       }
+      return NextResponse.next();
     }
 
     // Handle protected API routes
     if (path.startsWith('/api/')) {
+      // Allow admin API routes only with admin token
+      if (path.startsWith('/api/admin/') && !adminToken?.value) {
+        return NextResponse.json(
+          { error: 'Admin authentication required' },
+          { status: 401 }
+        );
+      }
+
       // Allow payment and booking routes only for authenticated users
       if ((path.startsWith('/api/payments/') || path.startsWith('/api/bookings/')) && !auth.userId) {
         return NextResponse.json(
@@ -98,6 +111,8 @@ export default authMiddleware({
         return NextResponse.redirect(signInUrl);
       }
     }
+
+    return NextResponse.next();
   }
 });
 

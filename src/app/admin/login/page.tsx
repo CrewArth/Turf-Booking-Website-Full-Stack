@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -9,6 +9,23 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Check if admin is already logged in
+    const checkAdminStatus = async () => {
+      try {
+        const response = await fetch('/api/admin/auth/check');
+        const data = await response.json();
+        if (data.isAdmin) {
+          router.push('/admin/slots');
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    };
+    checkAdminStatus();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,8 +47,14 @@ export default function AdminLogin() {
       console.log('Login response:', data); // Debug log
 
       if (data.success) {
-        router.push('/admin/slots');
-        router.refresh(); // Refresh to update UI with admin status
+        // Get the redirect URL from query params or default to /admin/slots
+        const redirectUrl = searchParams.get('redirect_url') || '/admin/slots';
+        
+        // Add a small delay to ensure the cookie is set
+        setTimeout(() => {
+          router.push(redirectUrl);
+          router.refresh();
+        }, 100);
       } else {
         setError(data.message || data.error || 'Authentication failed');
       }
