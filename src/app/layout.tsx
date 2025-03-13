@@ -35,10 +35,10 @@ export const metadata: Metadata = {
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.dev https://*.razorpay.com https://checkout.razorpay.com https://*.google.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      img-src 'self' data: https://*.clerk.dev https://* blob: https://res.cloudinary.com;
+      img-src 'self' data: https://*.clerk.dev https://* blob: https://res.cloudinary.com https://*.cloudinary.com;
       font-src 'self' https://fonts.gstatic.com;
       frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.accounts.dev https://*.clerk.dev https://*.google.com https://www.google.com;
-      connect-src 'self' https://*.clerk.dev https://api.razorpay.com https://*.razorpay.com https://res.cloudinary.com;
+      connect-src 'self' https://*.clerk.dev https://api.razorpay.com https://*.razorpay.com https://res.cloudinary.com https://*.cloudinary.com;
     `.replace(/\s+/g, ' ').trim()
   }
 };
