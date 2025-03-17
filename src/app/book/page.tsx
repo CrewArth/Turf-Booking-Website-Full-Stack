@@ -21,6 +21,7 @@ interface Booking {
   slotId: Slot;
   date: string;
   status: 'pending' | 'confirmed' | 'cancelled';
+  bothTurfs: boolean;
 }
 
 function formatTime(time: string): string {
@@ -42,6 +43,7 @@ export default function BookingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [bookBothTurfs, setBookBothTurfs] = useState(false);
   const router = useRouter();
 
   const nextDays = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
@@ -303,112 +305,191 @@ export default function BookingPage() {
     // Filter out bookings with null slotId
     const validBookings = bookings.filter(booking => booking.slotId && booking.slotId._id);
     
-    const bookedCount = validBookings.filter(
+    // Get confirmed bookings for this slot
+    const confirmedBookings = validBookings.filter(
       (booking) =>
         booking.slotId._id === slotId &&
         booking.status === 'confirmed'
-    ).length;
+    );
+
+    // Calculate total booked capacity considering bothTurfs
+    const totalBookedCapacity = confirmedBookings.reduce((total, booking) => {
+      return total + (booking.bothTurfs ? 2 : 1);
+    }, 0);
 
     const slot = slots.find((s) => s._id === slotId);
     if (!slot) return 0;
 
-    return slot.totalCapacity - bookedCount;
+    return Math.max(0, slot.totalCapacity - totalBookedCapacity);
   };
 
   const handleBooking = async () => {
-    if (!selectedSlot) {
-      toast.error('Please select a slot');
-      return;
-    }
-
     try {
-      setLoading(true);
-
-      // Check if slot exists and has capacity
-      const availableSlots = getAvailableSlots(selectedSlot._id);
-      if (availableSlots <= 0) {
-        toast.error('This slot is fully booked');
+      if (!selectedSlot) {
+        setError("Please select a slot first");
         return;
       }
 
-      // Create payment order
-      const orderData = await createPaymentOrder({
-        amount: selectedSlot.price * 100, // Convert to paise
-        currency: 'INR',
-        notes: {
-          slotId: selectedSlot._id,
-          date: format(selectedDate, 'yyyy-MM-dd'),
-          time: selectedSlot.time,
-        },
-      });
-
-      if (!orderData?.key || !orderData?.orderId) {
-        throw new Error('Failed to create payment order');
+      if (!user) {
+        router.push("/sign-in");
+        return;
       }
 
-      // Load Razorpay script
+      // Check if we have enough slots available for the booking
+      const availableSlots = getAvailableSlots(selectedSlot._id);
+      if (bookBothTurfs && availableSlots < 2) {
+        setError("Not enough slots available to book both turfs");
+        toast.error("Not enough slots available to book both turfs");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      // Load Razorpay script first
+      console.log('Loading Razorpay script...');
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded) {
-        throw new Error('Failed to load Razorpay script');
+        console.error('Failed to load Razorpay script');
+        setError("Failed to load payment gateway. Please try again.");
+        setLoading(false);
+        return;
+      }
+      console.log('Razorpay script loaded successfully');
+
+      // Check if Razorpay is available in window
+      if (!(window as any).Razorpay) {
+        console.error('Razorpay not found in window object');
+        setError("Payment gateway initialization failed. Please try again.");
+        setLoading(false);
+        return;
       }
 
-      // Initialize payment
-      const options = {
-        key: orderData.key,
-        amount: orderData.amount,
-        currency: 'INR',
-        name: 'Turf 106',
-        description: `Booking for ${format(selectedDate, 'dd MMM yyyy')} at ${formatTime(selectedSlot.time)}`,
-        order_id: orderData.orderId,
-        handler: async (response: any) => {
+      // Calculate the price based on whether both turfs are selected
+      const price = bookBothTurfs ? selectedSlot.price * 2 : selectedSlot.price;
+
+      console.log('Creating order with price:', price);
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: price,
+          slotId: selectedSlot._id,
+          date: format(selectedDate, "yyyy-MM-dd"),
+          bothTurfs: bookBothTurfs,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ 
+          error: `HTTP error! status: ${response.status}` 
+        }));
+        console.error('Order creation failed:', {
+          status: response.status,
+          error: errorData
+        });
+
+        // Handle specific status codes
+        if (response.status === 401) {
+          // Unauthorized - redirect to sign in
+          router.push("/sign-in");
+          return;
+        }
+
+        setError(errorData.error || `Failed to create order (${response.status}). Please try again.`);
+        setLoading(false);
+        return;
+      }
+
+      const order = await response.json();
+      console.log('Order created successfully:', order);
+
+      if (!order.id || !order.amount) {
+        console.error('Invalid order response:', order);
+        setError("Invalid order response from server. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+      if (!razorpayKey) {
+        console.error('Razorpay key is not configured');
+        setError("Payment gateway configuration is missing. Please contact support.");
+        setLoading(false);
+        return;
+      }
+
+      console.log('Initializing Razorpay checkout...');
+      const RazorpayCheckout = new (window as any).Razorpay({
+        key: razorpayKey,
+        amount: order.amount,
+        currency: "INR",
+        name: "Turf Booking",
+        description: `Booking for ${format(selectedDate, "dd MMM yyyy")} - ${selectedSlot.time}`,
+        order_id: order.id,
+        handler: async function (response: any) {
           try {
-            // Create booking
-            const bookingResponse = await fetch('/api/bookings', {
-              method: 'POST',
+            console.log('Payment successful, verifying...', response);
+            const verifyResponse = await fetch("/api/bookings", {
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
               },
               body: JSON.stringify({
                 slotId: selectedSlot._id,
-                date: format(selectedDate, 'yyyy-MM-dd'),
+                date: format(selectedDate, "yyyy-MM-dd"),
                 paymentId: response.razorpay_payment_id,
                 orderId: response.razorpay_order_id,
                 signature: response.razorpay_signature,
-                amount: selectedSlot.price,
+                amount: price,
+                bothTurfs: bookBothTurfs,
               }),
             });
 
-            const bookingData = await bookingResponse.json();
-
-            if (!bookingResponse.ok) {
-              throw new Error(bookingData.message || 'Failed to create booking');
+            if (!verifyResponse.ok) {
+              const errorData = await verifyResponse.json().catch(() => ({}));
+              console.error('Payment verification failed:', errorData);
+              throw new Error(errorData.error || "Payment verification failed");
             }
 
-            toast.success('Booking confirmed!');
-            router.push('/bookings');
+            console.log('Payment verified successfully');
+            toast.success('Booking confirmed successfully!');
+            router.push("/bookings");
           } catch (error) {
-            console.error('Booking creation error:', error);
-            toast.error('Failed to confirm booking. Please contact support.');
+            console.error('Payment verification error:', error);
+            setError(error instanceof Error ? error.message : "Payment verification failed");
+            setLoading(false);
           }
         },
         prefill: {
-          email: user?.emailAddresses?.[0]?.emailAddress || '',
-          contact: '',
+          name: user.fullName,
+          email: user.primaryEmailAddress?.emailAddress,
         },
         theme: {
-          color: '#16a34a',
+          color: "#16a34a",
         },
-      };
+        modal: {
+          ondismiss: function() {
+            console.log('Checkout form closed');
+            setLoading(false);
+          }
+        }
+      });
 
-      const razorpay = new (window as any).Razorpay(options);
-      razorpay.open();
+      RazorpayCheckout.on('payment.failed', function (response: any) {
+        console.error('Payment failed:', response.error);
+        setPaymentError(response.error.description || "Payment failed");
+        setLoading(false);
+      });
+
+      RazorpayCheckout.open();
+      console.log('Razorpay checkout opened');
     } catch (error) {
-      console.error('Payment initialization error:', error);
-      toast.error(
-        error instanceof Error 
-          ? error.message 
-          : 'Failed to initialize payment'
-      );
+      console.error('Booking error:', error);
+      setError(error instanceof Error ? error.message : "Failed to create booking");
+      toast.error(error instanceof Error ? error.message : "Failed to create booking");
     } finally {
       setLoading(false);
     }
@@ -615,8 +696,37 @@ export default function BookingPage() {
                     {formatTime(selectedSlot.time)}
                   </span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">
-                  ₹{selectedSlot.price}
+                <div className="flex items-center gap-4">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ₹{selectedSlot.price * (bookBothTurfs ? 2 : 1)}
+                  </div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={bookBothTurfs}
+                      onChange={(e) => {
+                        const availableSlots = getAvailableSlots(selectedSlot._id);
+                        if (availableSlots >= 2) {
+                          setBookBothTurfs(e.target.checked);
+                        } else {
+                          toast.error('Not enough slots available to book both turfs');
+                        }
+                      }}
+                      disabled={getAvailableSlots(selectedSlot._id) < 2}
+                      className={`form-checkbox h-5 w-5 rounded border-gray-300 focus:ring-green-500 ${
+                        getAvailableSlots(selectedSlot._id) < 2 
+                          ? 'text-gray-400 cursor-not-allowed' 
+                          : 'text-green-600'
+                      }`}
+                    />
+                    <span className={`text-sm ${
+                      getAvailableSlots(selectedSlot._id) < 2 
+                        ? 'text-gray-400' 
+                        : 'text-gray-700'
+                    }`}>
+                      Book Both Turfs {getAvailableSlots(selectedSlot._id) < 2 && '(Not Available)'}
+                    </span>
+                  </label>
                 </div>
               </div>
               <button

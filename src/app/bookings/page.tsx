@@ -22,6 +22,7 @@ interface Booking {
   date: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   createdAt: string;
+  bothTurfs: boolean;
   ticket?: {
     ticketNumber: string;
     qrCode: string;
@@ -32,6 +33,7 @@ interface Booking {
         time: string;
         price: number;
       };
+      bothTurfs: boolean;
     };
   };
 }
@@ -65,7 +67,8 @@ export default function BookingsPage() {
       console.log('Opening ticket:', {
         bookingId: booking._id,
         hasTicket: !!booking.ticket,
-        ticketData: booking.ticket
+        ticketData: booking.ticket,
+        bothTurfs: booking.bothTurfs
       });
 
       if (!booking.ticket) {
@@ -82,7 +85,15 @@ export default function BookingsPage() {
           throw new Error('Failed to fetch ticket');
         }
 
-        const ticket = await ticketResponse.json();
+        const ticketData = await ticketResponse.json();
+        // Ensure bothTurfs is included in the ticket data
+        const ticket = {
+          ...ticketData,
+          bookingId: {
+            ...ticketData.bookingId,
+            bothTurfs: booking.bothTurfs
+          }
+        };
         setSelectedBooking({ ...booking, ticket });
       }
     } catch (error) {
@@ -223,7 +234,12 @@ export default function BookingsPage() {
                             <h3 className="text-lg font-semibold text-gray-900">
                               {format(new Date(booking.date), 'MMMM d, yyyy')}
                             </h3>
-                            <p className="text-gray-600">{formatTime(booking.slotId.time)}</p>
+                            <p className="text-gray-600">{booking.slotId.time}</p>
+                            {booking.bothTurfs && (
+                              <p className="text-sm text-orange-600 font-medium mt-1">
+                                Both Turfs Booked
+                              </p>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -240,7 +256,9 @@ export default function BookingsPage() {
                       {booking.slotId && (
                         <div className="text-right">
                           <p className="text-sm text-gray-600">Price</p>
-                          <p className="text-lg font-bold text-gray-900">₹{booking.slotId.price}</p>
+                          <p className="text-lg font-bold text-gray-900">
+                            ₹{booking.bothTurfs ? booking.slotId.price * 2 : booking.slotId.price}
+                          </p>
                         </div>
                       )}
                       <div className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -253,16 +271,16 @@ export default function BookingsPage() {
                         {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                       </div>
                     </div>
-
-                    {booking.status === 'confirmed' && booking.slotId && (
-                      <button
-                        onClick={() => handleViewTicket(booking)}
-                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                      >
-                        View Ticket
-                      </button>
-                    )}
                   </div>
+
+                  {booking.status === 'confirmed' && booking.slotId && (
+                    <button
+                      onClick={() => handleViewTicket(booking)}
+                      className="mt-4 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      View Ticket
+                    </button>
+                  )}
 
                   <div className="mt-4 text-sm text-gray-500">
                     Booked on {format(new Date(booking.createdAt), 'MMM d, yyyy h:mm a')}
@@ -275,7 +293,7 @@ export default function BookingsPage() {
       </div>
 
       {/* Ticket Modal */}
-      {showTicket && selectedBooking?.ticket && (
+      {showTicket && selectedBooking && selectedBooking.ticket && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto"
           onClick={(e) => {

@@ -58,7 +58,8 @@ export async function POST(req: Request) {
       paymentId,
       orderId,
       signature,
-      amount
+      amount,
+      bothTurfs
     } = await req.json();
 
     console.log('Received booking data:', {
@@ -66,7 +67,8 @@ export async function POST(req: Request) {
       date,
       paymentId,
       orderId,
-      amount
+      amount,
+      bothTurfs
     });
 
     // Verify payment signature
@@ -103,10 +105,12 @@ export async function POST(req: Request) {
 
     console.log('Existing bookings:', existingBookings, 'Total capacity:', slot.totalCapacity);
 
-    if (existingBookings >= slot.totalCapacity) {
+    // Check capacity based on whether booking both turfs
+    const requiredCapacity = bothTurfs ? 2 : 1;
+    if (existingBookings + requiredCapacity > slot.totalCapacity) {
       console.error('Slot is fully booked');
       return NextResponse.json(
-        { error: 'Slot is fully booked' },
+        { error: bothTurfs ? 'Both turfs are not available' : 'Slot is fully booked' },
         { status: 400 }
       );
     }
@@ -133,6 +137,7 @@ export async function POST(req: Request) {
       date,
       amount,
       status: 'confirmed',
+      bothTurfs,
       paymentDetails: {
         paymentId,
         orderId,

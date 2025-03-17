@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
         userId,
         date: booking.date,
         time: booking.slotId.time,
-        amount: booking.amount
+        amount: booking.amount,
+        bothTurfs: booking.bothTurfs || false
       };
 
       console.log('Generating QR code with data:', qrData);

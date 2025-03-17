@@ -23,6 +23,10 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  bothTurfs: {
+    type: Boolean,
+    default: false,
+  },
   paymentDetails: {
     paymentId: {
       type: String,

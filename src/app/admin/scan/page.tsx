@@ -11,6 +11,7 @@ interface TicketData {
   date: string;
   time: string;
   amount: number;
+  bothTurfs: boolean;
 }
 
 interface VerificationResult {
@@ -25,6 +26,7 @@ interface VerificationResult {
       };
       userId: string;
       status: string;
+      bothTurfs: boolean;
     };
     createdAt: string;
     isUsed?: boolean;
@@ -163,8 +165,17 @@ export default function ScanPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Amount Paid</p>
-                    <p className="font-medium">₹{scanResult.ticket.bookingId.slotId.price}</p>
+                    <p className="font-medium">
+                      ₹{scanResult.ticket.bookingId.bothTurfs 
+                        ? scanResult.ticket.bookingId.slotId.price * 2 
+                        : scanResult.ticket.bookingId.slotId.price}
+                    </p>
                   </div>
+                  {scanResult.ticket.bookingId.bothTurfs && (
+                    <div>
+                      <p className="text-sm text-orange-600 font-medium">Both Turfs Booked</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-gray-600">Status</p>
                     <p className={`font-medium ${scanResult.isValid ? 'text-green-600' : 'text-red-600'}`}>

@@ -49,7 +49,13 @@ export async function POST(req: Request) {
     if (ticket.isUsed && ticket.usedAt) {
       return NextResponse.json({
         isValid: false,
-        ticket: ticket.toObject(),
+        ticket: {
+          ...ticket.toObject(),
+          bookingId: {
+            ...ticket.bookingId.toObject(),
+            bothTurfs: ticket.bookingId.bothTurfs || false
+          }
+        },
         message: `Ticket was already used on ${ticket.usedAt.toLocaleString()}`
       });
     }
@@ -61,7 +67,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       isValid: true,
-      ticket: ticket.toObject(),
+      ticket: {
+        ...ticket.toObject(),
+        bookingId: {
+          ...ticket.bookingId.toObject(),
+          bothTurfs: ticket.bookingId.bothTurfs || false
+        }
+      },
       message: 'Ticket verified successfully'
     });
   } catch (error) {
